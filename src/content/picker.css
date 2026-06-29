@@ -1,0 +1,74 @@
+/* 요소 선택 모드에서 페이지에 주입되는 스타일 */
+
+html.__ua-picking, html.__ua-picking * {
+  cursor: crosshair !important;
+}
+
+.__ua-overlay {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  background: rgba(45, 212, 191, 0.22);
+  border: 2px solid #14b8a6;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  transition: all 0.04s ease-out;
+}
+
+.__ua-label {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  max-width: 60vw;
+  padding: 3px 7px;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #fff;
+  background: #0f172a;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.__ua-hint {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #fff;
+  background: #4f46e5;
+  border-radius: 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* 단축키 복사 등 페이지 피드백 토스트 */
+.__ua-toast {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  bottom: 24px;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  padding: 10px 18px;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 700;
+  color: #042f2e;
+  background: #2dd4bf;
+  border-radius: 22px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.__ua-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.__ua-toast.error {
+  color: #fff;
+  background: #f43f5e;
+}
