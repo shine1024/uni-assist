@@ -18,6 +18,30 @@
     return window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/[^\w-]/g, "\\$&");
   }
 
+  // 상태에 따라 붙었다 떨어지는 동적 클래스는 앵커로 쓰지 않는다(상태/할당/일정 등).
+  function isStableClass(c) {
+    if (!c || /\d/.test(c)) return false; // status-10, tracker-10, priority-2 ...
+    return !/^(status|priority|tracker|behind-schedule|created-by|assigned-to|closed|open|active|selected|current|hover|hascontextmenu)/.test(
+      c
+    );
+  }
+
+  // 한 요소의 셀렉터 조각: 부모 안에서 '유일한' 안정 클래스가 있으면 위치 비의존으로,
+  // 없으면 태그만(유일할 때), 그래도 안 되면 nth-of-type 위치로.
+  function segmentFor(node) {
+    const tag = node.tagName.toLowerCase();
+    const parent = node.parentElement;
+    if (!parent) return tag;
+    for (const c of node.classList) {
+      if (!isStableClass(c)) continue;
+      const sel = `${tag}.${esc(c)}`;
+      if (parent.querySelectorAll(`:scope > ${sel}`).length === 1) return sel;
+    }
+    const sameTag = Array.from(parent.children).filter((x) => x.tagName === node.tagName);
+    if (sameTag.length === 1) return tag; // 태그만으로 유일하면 위치 생략
+    return `${tag}:nth-of-type(${sameTag.indexOf(node) + 1})`;
+  }
+
   function buildSelector(el) {
     if (!(el instanceof Element)) return null;
     const parts = [];
@@ -27,17 +51,12 @@
         parts.unshift("#" + esc(node.id));
         break; // id를 고유 앵커로 사용
       }
-      let sel = node.tagName.toLowerCase();
-      const parent = node.parentElement;
-      if (parent) {
-        const sameTag = Array.from(parent.children).filter(
-          (c) => c.tagName === node.tagName
-        );
-        if (sameTag.length > 1) {
-          sel += `:nth-of-type(${sameTag.indexOf(node) + 1})`;
-        }
-      }
-      parts.unshift(sel);
+      parts.unshift(segmentFor(node));
+      // 여기까지의 경로가 문서에서 이미 유일하면 더 올라가지 않는다(짧고 안정적).
+      const sel = parts.join(" > ");
+      try {
+        if (document.querySelectorAll(sel).length === 1) return sel;
+      } catch (_) {}
       node = node.parentElement;
     }
     return parts.join(" > ");
