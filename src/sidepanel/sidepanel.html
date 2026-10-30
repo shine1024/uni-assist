@@ -14,89 +14,224 @@
       </div>
     </header>
 
+    <!-- 기능 메뉴 -->
+    <nav class="nav" id="nav">
+      <button class="nav-btn active" data-view="extract">🔤 텍스트 추출</button>
+      <button class="nav-btn" data-view="login">🔐 자동 로그인</button>
+      <button class="nav-btn" data-view="settings">⚙ 설정</button>
+    </nav>
+
     <main>
-      <!-- 기능: 텍스트 추출 -->
-      <section class="feature-head">
-        <h2>🔤 텍스트 추출</h2>
-        <button id="btn-add-rule" class="btn btn-primary" title="새 규칙을 추가하고 페이지에서 요소를 선택합니다">
-          + 요소 선택
-        </button>
-      </section>
+      <!-- ================= 텍스트 추출 (기존) ================= -->
+      <div class="view" id="view-extract">
+        <section class="feature-head">
+          <h2>🔤 텍스트 추출</h2>
+          <button id="btn-add-rule" class="btn btn-primary" title="새 규칙을 추가하고 페이지에서 요소를 선택합니다">
+            + 요소 선택
+          </button>
+        </section>
 
-      <!-- 규칙 목록 -->
-      <section id="rules" class="rules"></section>
+        <!-- 규칙 목록 -->
+        <section id="rules" class="rules"></section>
 
-      <p id="empty-hint" class="empty-hint">
-        <strong>＋ 요소 선택</strong> 버튼을 눌러 페이지의 요소를 선택하세요.<br />
-        여러 개를 추가하면 아래에서 순서대로 조합됩니다.
-      </p>
-
-      <!-- 조합 설정 -->
-      <section class="combine card">
-        <div class="card-head">
-          <h2>조합 결과</h2>
-          <div class="seg" id="mode-seg">
-            <button data-mode="join" class="seg-btn active">연결</button>
-            <button data-mode="template" class="seg-btn">템플릿</button>
-          </div>
-        </div>
-
-        <div id="join-opts" class="combine-opts">
-          <label>구분자</label>
-          <select id="separator">
-            <option value="none">없음</option>
-            <option value="space">공백</option>
-            <option value="newline">줄바꿈</option>
-            <option value="tab">탭</option>
-            <option value="comma">쉼표(, )</option>
-            <option value="custom">직접 입력…</option>
-          </select>
-          <input id="custom-sep" class="custom-sep hidden" placeholder="구분자 입력" />
-        </div>
-
-        <div id="template-opts" class="combine-opts hidden">
-          <label>템플릿 <span class="muted">{1}, {2} … = 각 규칙 결과</span></label>
-          <textarea id="template" rows="3" placeholder="예) [{1}] {2} - {3}"></textarea>
-        </div>
-
-        <div class="result-box">
-          <textarea id="result" rows="3" readonly placeholder="조합 결과가 여기에 표시됩니다"></textarea>
-          <div class="result-actions">
-            <button id="btn-refresh" class="btn btn-ghost" title="현재 페이지에서 모든 요소를 다시 추출">↻ 재추출</button>
-            <button id="btn-copy" class="btn btn-primary">📋 복사</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- 사이트 & 단축키 -->
-      <section class="shortcut card">
-        <div class="card-head">
-          <h2>단축키 복사</h2>
-          <span id="shortcut-key" class="kbd" title="chrome://extensions/shortcuts 에서 변경">…</span>
-        </div>
-        <p class="muted hint-text">
-          아래 <b>허용 사이트</b>에서 단축키를 누르면, 현재 페이지에서 규칙을 재추출해
-          <b>조합 결과를 자동 복사</b>합니다. (사이드 패널을 열어두지 않아도 동작)
+        <p id="empty-hint" class="empty-hint">
+          <strong>＋ 요소 선택</strong> 버튼을 눌러 페이지의 요소를 선택하세요.<br />
+          여러 개를 추가하면 아래에서 순서대로 조합됩니다.
         </p>
-        <label class="muted">허용 사이트 패턴 <span class="muted">(한 줄에 하나, <code>*</code> 와일드카드)</span></label>
-        <textarea id="allowed-patterns" rows="3" spellcheck="false"
-          placeholder="https://labdev.unipost.co.kr/redmine"></textarea>
-        <div class="result-actions">
-          <button id="btn-change-shortcut" class="btn btn-ghost btn-sm">단축키 변경…</button>
-        </div>
-      </section>
 
-      <!-- 프리셋 -->
-      <section class="presets card">
-        <div class="card-head">
-          <h2>프리셋</h2>
-          <div class="header-actions">
-            <input id="preset-name" class="preset-name" placeholder="프리셋 이름" />
-            <button id="btn-save-preset" class="btn btn-ghost">저장</button>
+        <!-- 조합 설정 -->
+        <section class="combine card">
+          <div class="card-head">
+            <h2>조합 결과</h2>
+            <div class="seg" id="mode-seg">
+              <button data-mode="join" class="seg-btn active">연결</button>
+              <button data-mode="template" class="seg-btn">템플릿</button>
+            </div>
           </div>
-        </div>
-        <ul id="preset-list" class="preset-list"></ul>
-      </section>
+
+          <div id="join-opts" class="combine-opts">
+            <label>구분자</label>
+            <select id="separator">
+              <option value="none">없음</option>
+              <option value="space">공백</option>
+              <option value="newline">줄바꿈</option>
+              <option value="tab">탭</option>
+              <option value="comma">쉼표(, )</option>
+              <option value="custom">직접 입력…</option>
+            </select>
+            <input id="custom-sep" class="custom-sep hidden" placeholder="구분자 입력" />
+          </div>
+
+          <div id="template-opts" class="combine-opts hidden">
+            <label>템플릿 <span class="muted">{1}, {2} … = 각 규칙 결과</span></label>
+            <textarea id="template" rows="3" placeholder="예) [{1}] {2} - {3}"></textarea>
+          </div>
+
+          <div class="result-box">
+            <textarea id="result" rows="3" readonly placeholder="조합 결과가 여기에 표시됩니다"></textarea>
+            <div class="result-actions">
+              <button id="btn-refresh" class="btn btn-ghost" title="현재 페이지에서 모든 요소를 다시 추출">↻ 재추출</button>
+              <button id="btn-copy" class="btn btn-primary">📋 복사</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 프리셋 -->
+        <section class="presets card">
+          <div class="card-head">
+            <h2>프리셋</h2>
+            <div class="header-actions">
+              <input id="preset-name" class="preset-name" placeholder="프리셋 이름" />
+              <button id="btn-save-preset" class="btn btn-ghost">저장</button>
+            </div>
+          </div>
+          <ul id="preset-list" class="preset-list"></ul>
+        </section>
+      </div>
+
+      <!-- ================= 자동 로그인 (신규) ================= -->
+      <div class="view hidden" id="view-login">
+        <!-- 잠금 / 최초 설정 -->
+        <section class="card lock-card hidden" id="lock-screen">
+          <div class="card-head">
+            <h2 id="lock-title">🔒 잠금 해제</h2>
+          </div>
+          <p class="muted hint-text" id="lock-hint"></p>
+          <div class="field-col">
+            <input id="master-pw" type="password" autocomplete="off" placeholder="마스터 비밀번호" />
+            <input id="master-pw2" type="password" autocomplete="off" class="hidden"
+              placeholder="마스터 비밀번호 확인 (8자 이상)" />
+          </div>
+          <p class="err hidden" id="lock-error"></p>
+          <div class="result-actions">
+            <button id="btn-unlock" class="btn btn-primary">잠금 해제</button>
+          </div>
+          <p class="muted warn-text" id="lock-warn">
+            ⚠ 마스터 비밀번호는 어디에도 저장되지 않습니다. <b>분실하면 저장된 비밀번호를 복구할 수 없습니다.</b>
+          </p>
+        </section>
+
+        <!-- 사이트 목록 -->
+        <section class="hidden" id="login-main">
+          <section class="feature-head">
+            <h2>🔐 자동 로그인</h2>
+            <div class="header-actions">
+              <button id="btn-lock-now-2" class="btn btn-ghost btn-sm" title="지금 잠그기">🔒</button>
+              <button id="btn-add-site" class="btn btn-primary">+ 사이트</button>
+            </div>
+          </section>
+
+          <p class="muted hint-text" id="login-shortcut-hint"></p>
+          <input id="site-search" placeholder="사이트 검색 (이름·주소)" />
+          <div id="current-match" class="current-match hidden"></div>
+          <div id="site-list" class="site-list"></div>
+          <p class="empty-hint hidden" id="site-empty">
+            등록된 사이트가 없습니다.<br /><strong>+ 사이트</strong> 를 눌러 추가하세요.
+          </p>
+        </section>
+
+        <!-- 사이트 상세 (login.js 가 렌더) -->
+        <section class="hidden" id="site-detail"></section>
+      </div>
+
+      <!-- ================= 설정 ================= -->
+      <div class="view hidden" id="view-settings">
+        <!-- 보안 -->
+        <section class="card" id="security-card">
+          <div class="card-head">
+            <h2>🔐 보안 (자동 로그인)</h2>
+            <span class="kbd" id="sec-status">…</span>
+          </div>
+          <div class="combine-opts">
+            <label>자동 잠금</label>
+            <select id="auto-lock-min">
+              <option value="5">5분</option>
+              <option value="15">15분</option>
+              <option value="30">30분</option>
+              <option value="60">1시간</option>
+              <option value="240">4시간</option>
+            </select>
+            <button id="btn-lock-now" class="btn btn-ghost btn-sm">지금 잠그기</button>
+          </div>
+
+          <div class="result-actions">
+            <button id="btn-toggle-change-master" class="btn btn-ghost btn-sm">마스터 비밀번호 변경…</button>
+          </div>
+
+          <div class="hidden field-col" id="change-master-form">
+            <input id="cm-old" type="password" autocomplete="off" placeholder="현재 마스터 비밀번호" />
+            <input id="cm-new" type="password" autocomplete="off" placeholder="새 마스터 비밀번호 (8자 이상)" />
+            <input id="cm-new2" type="password" autocomplete="off" placeholder="새 마스터 비밀번호 확인" />
+            <p class="err hidden" id="cm-error"></p>
+            <div class="result-actions">
+              <button id="btn-change-master" class="btn btn-primary btn-sm">변경 및 재암호화</button>
+            </div>
+            <p class="muted warn-text">
+              변경하면 저장된 모든 비밀번호를 새 키로 <b>다시 암호화</b>합니다. 다른 PC는 동기화 후 새 비밀번호를 사용하세요.
+            </p>
+          </div>
+        </section>
+
+        <!-- 동기화 -->
+        <section class="card">
+          <div class="card-head">
+            <h2>동기화 (PC 간)</h2>
+            <span class="kbd" id="sync-badge">…</span>
+          </div>
+          <p class="muted hint-text">
+            사이트·계정·셀렉터·<b>암호화된</b> 비밀번호는 <code>chrome.storage.sync</code>로 같은 구글 계정의 다른 PC에
+            전달됩니다. <b>마스터 비밀번호·복호화 키·잠금 해제 세션은 동기화되지 않습니다.</b><br />
+            크롬 동기화가 꺼져 있으면 이 PC에만 저장되고, 로그인·동기화를 켜면 그때 올라갑니다.
+            다른 PC에서도 <b>같은 마스터 비밀번호</b>를 입력해야 복호화됩니다.
+          </p>
+          <div class="usage"><div class="usage-bar" id="usage-bar"></div></div>
+          <p class="muted" id="sync-info">…</p>
+        </section>
+
+        <!-- 단축키 -->
+        <section class="shortcut card">
+          <div class="card-head">
+            <h2>단축키</h2>
+            <button id="btn-change-shortcut" class="btn btn-ghost btn-sm">단축키 변경…</button>
+          </div>
+          <ul class="kv">
+            <li><span>텍스트 추출 복사</span><span class="kbd" id="shortcut-key">…</span></li>
+            <li><span>자동 로그인 <span class="muted">(브라우저 전역)</span></span><span class="kbd" id="login-shortcut-key">…</span></li>
+          </ul>
+
+          <h3 class="sub-head">페이지 내 단축키 <span class="muted">— <code>F2</code> 처럼 수정자 없는 키 가능</span></h3>
+          <ul class="kv">
+            <li>
+              <span>로그인 / 로그아웃</span>
+              <span class="hk-row">
+                <span class="kbd" id="page-hotkey">…</span>
+                <button id="btn-capture-hotkey" class="btn btn-sm" data-hk="auth">키 지정</button>
+                <label class="chk"><input type="checkbox" id="page-hotkey-enabled" /> 사용</label>
+              </span>
+            </li>
+            <li>
+              <span>사이드 패널 열기 / 닫기</span>
+              <span class="hk-row">
+                <span class="kbd" id="panel-hotkey">…</span>
+                <button id="btn-capture-panel-hotkey" class="btn btn-sm" data-hk="panel">키 지정</button>
+                <label class="chk"><input type="checkbox" id="panel-hotkey-enabled" /> 사용</label>
+              </span>
+            </li>
+          </ul>
+          <label class="chk">
+            <input type="checkbox" id="hotkey-all-sites" />
+            모든 사이트에서 사용 <span class="muted">(끄면 등록된 로그인 사이트에서만)</span>
+          </label>
+          <p class="muted hint-text" id="page-hotkey-note"></p>
+          <p class="muted hint-text">
+            아래 <b>허용 사이트</b>에서 복사 단축키를 누르면, 현재 페이지에서 규칙을 재추출해
+            <b>조합 결과를 자동 복사</b>합니다. (사이드 패널을 열어두지 않아도 동작)
+          </p>
+          <label class="muted">허용 사이트 패턴 <span class="muted">(한 줄에 하나, <code>*</code> 와일드카드)</span></label>
+          <textarea id="allowed-patterns" rows="3" spellcheck="false"
+            placeholder="https://labdev.unipost.co.kr/redmine"></textarea>
+        </section>
+      </div>
     </main>
 
     <div id="toast" class="toast hidden"></div>

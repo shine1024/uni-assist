@@ -18,6 +18,36 @@
     return window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/[^\w-]/g, "\\$&");
   }
 
+  // 속성 선택자 안의 값 이스케이프 ("[name=\"...\"]" 형태로 쓰기 위해)
+  function attrEsc(v) {
+    return String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  // 위치에 의존하지 않고 비교적 오래 유지되는 속성 (앞쪽이 더 안정적).
+  // 로그인 입력창(아이디/비밀번호/버튼)은 name·autocomplete·type 이 거의 항상 안정적이다.
+  const STABLE_ATTRS = [
+    "name",
+    "data-testid",
+    "data-test",
+    "data-qa",
+    "data-cy",
+    "autocomplete",
+    "aria-label",
+    "placeholder",
+    "type",
+  ];
+
+  function attrCandidates(node) {
+    const tag = node.tagName.toLowerCase();
+    const out = [];
+    for (const a of STABLE_ATTRS) {
+      const v = node.getAttribute && node.getAttribute(a);
+      if (!v || v.length > 64 || /[\r\n]/.test(v)) continue;
+      out.push(`${tag}[${a}="${attrEsc(v)}"]`);
+    }
+    return out;
+  }
+
   // 상태에 따라 붙었다 떨어지는 동적 클래스는 앵커로 쓰지 않는다(상태/할당/일정 등).
   function isStableClass(c) {
     if (!c || /\d/.test(c)) return false; // status-10, tracker-10, priority-2 ...
@@ -32,6 +62,9 @@
     const tag = node.tagName.toLowerCase();
     const parent = node.parentElement;
     if (!parent) return tag;
+    for (const sel of attrCandidates(node)) {
+      if (parent.querySelectorAll(`:scope > ${sel}`).length === 1) return sel;
+    }
     for (const c of node.classList) {
       if (!isStableClass(c)) continue;
       const sel = `${tag}.${esc(c)}`;
@@ -44,6 +77,17 @@
 
   function buildSelector(el) {
     if (!(el instanceof Element)) return null;
+
+    // 문서 전체에서 유일한 앵커가 있으면 짧고 안정적인 셀렉터로 끝낸다.
+    const anchors = [];
+    if (el.id) anchors.push("#" + esc(el.id));
+    anchors.push(...attrCandidates(el));
+    for (const a of anchors) {
+      try {
+        if (document.querySelectorAll(a).length === 1) return a;
+      } catch (_) {}
+    }
+
     const parts = [];
     let node = el;
     while (node && node.nodeType === 1 && node !== document.documentElement) {
@@ -67,9 +111,15 @@
     return el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
   }
 
+  // 비밀번호 입력창의 값은 패널/스토리지로 내보내지 않는다(평문 저장 금지).
+  function isSecretField(el) {
+    return !!el && el.tagName === "INPUT" && String(el.type).toLowerCase() === "password";
+  }
+
   // source: innerText | textContent | value | attr
   function extractValue(el, source, attrName) {
     if (!el) return "";
+    if (source === "value" && isSecretField(el)) return ""; // 비밀번호 필드는 항상 빈 값
     switch (source) {
       case "value":
         if (el.tagName === "SELECT") {
@@ -201,6 +251,8 @@
       index,
       source,
       tag: el.tagName.toLowerCase(),
+      inputType: el.tagName === "INPUT" ? String(el.type || "").toLowerCase() : "",
+      isSecret: isSecretField(el),
       rawText: extractValue(el, source),
     });
   }

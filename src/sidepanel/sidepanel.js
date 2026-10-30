@@ -1,6 +1,9 @@
-// 사이드 패널 컨트롤러 — 상태 관리, 요소 선택/추출, 변환·조합, 프리셋, 단축키 설정
+// 사이드 패널 컨트롤러 — 메뉴 전환 + (텍스트 추출) 상태 관리·요소 선택/추출·변환·조합·프리셋·단축키 설정
+// 자동 로그인 화면은 독립 모듈 `login.js` 가 담당한다.
 import { applyTransforms, combineResults } from "../lib/transform.js";
 import { parsePatterns } from "../lib/match.js";
+import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
+import { initLoginUI, onViewShown } from "./login.js";
 
 const DEFAULT_PATTERNS = ["https://labdev.unipost.co.kr/redmine"];
 
@@ -160,19 +163,7 @@ function renderCombineControls() {
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 // ---- 요소 선택 / 추출 (콘텐츠 스크립트 연동) -----------------------------
-async function getActiveTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab;
-}
-
-function injectable(url) {
-  return /^(https?|file):/.test(url || "");
-}
-
-async function ensurePicker(tabId) {
-  await chrome.scripting.insertCSS({ target: { tabId }, files: ["src/content/picker.css"] });
-  await chrome.scripting.executeScript({ target: { tabId }, files: ["src/content/picker.js"] });
-}
+// getActiveTab / injectable / ensurePicker 는 ../lib/tabs.js 공용 헬퍼
 
 async function startPicking(ruleId) {
   const tab = await getActiveTab();
@@ -228,6 +219,8 @@ async function refreshAll() {
 // 콘텐츠 스크립트로부터의 메시지 수신
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg) return;
+  // 자동 로그인 셀렉터 선택(ruleId: "login:*")은 login.js 가 처리한다
+  if (typeof msg.ruleId === "string" && msg.ruleId.startsWith("login:")) return;
   if (msg.type === "ELEMENT_PICKED") {
     const r = state.rules.find((x) => x.id === msg.ruleId);
     if (r) {
@@ -473,10 +466,15 @@ async function loadShortcutSettings() {
   }
   try {
     const cmds = await chrome.commands.getAll();
-    const c = cmds.find((x) => x.name === "copy-combined");
-    $("#shortcut-key").textContent = c && c.shortcut ? c.shortcut : "(미설정)";
+    const show = (name, el) => {
+      const c = cmds.find((x) => x.name === name);
+      $(el).textContent = c && c.shortcut ? c.shortcut : "(미설정 · 충돌 가능)";
+    };
+    show("copy-combined", "#shortcut-key");
+    show("auto-login", "#login-shortcut-key");
   } catch (_) {
     $("#shortcut-key").textContent = "단축키";
+    $("#login-shortcut-key").textContent = "단축키";
   }
 }
 
@@ -503,6 +501,41 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.add("hidden"), 1600);
 }
 
+// ---- 패널 열림 상태 알리기 (F4 토글용) -----------------------------------
+// sidePanel 에는 "열려 있는지" 묻는 API 가 없어서, 패널이 살아 있는 동안 포트를 연결해 둔다.
+// 서비스 워커가 재시작되면 포트가 끊기므로 다시 연결한다.
+(function keepPanelPort() {
+  let retry = null;
+  async function connect() {
+    try {
+      const win = await chrome.windows.getCurrent();
+      const port = chrome.runtime.connect({ name: "ua-sidepanel:" + win.id });
+      port.onDisconnect.addListener(() => {
+        clearTimeout(retry);
+        retry = setTimeout(connect, 500);
+      });
+    } catch (_) {
+      clearTimeout(retry);
+      retry = setTimeout(connect, 1000);
+    }
+  }
+  connect();
+})();
+
+// ---- 메뉴(뷰) 전환 -------------------------------------------------------
+const VIEWS = ["extract", "login", "settings"];
+
+function showView(name) {
+  VIEWS.forEach((v) => $(`#view-${v}`).classList.toggle("hidden", v !== name));
+  $$(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  onViewShown(name); // 자동 로그인/설정 화면은 열릴 때마다 최신 상태로
+}
+
+$("#nav").addEventListener("click", (e) => {
+  const b = e.target.closest(".nav-btn");
+  if (b) showView(b.dataset.view);
+});
+
 // ---- 초기화 --------------------------------------------------------------
 (async function init() {
   await loadState();
@@ -510,4 +543,13 @@ function toast(msg) {
   renderRules();
   renderPresets();
   loadShortcutSettings();
+  await initLoginUI({ showView, toast });
+
+  // 단축키로 자동 로그인을 시도했는데 잠겨 있어 패널이 열린 경우 → 바로 잠금 화면으로
+  try {
+    const r = await chrome.runtime.sendMessage({ type: "LOGIN_HAS_PENDING" });
+    if (r && r.pending) showView("login");
+  } catch (_) {
+    /* 서비스 워커 미기동 등 */
+  }
 })();

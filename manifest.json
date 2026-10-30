@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Uni-Assist 도우미",
-  "version": "0.2.1",
-  "description": "웹 업무 생산성을 돕는 도우미. 현재 기능: 여러 요소 텍스트 추출·정규식 변환·조합 복사, 허용 사이트 단축키 복사. (기능 추가 예정)",
+  "version": "0.4.1",
+  "description": "웹 업무 생산성을 돕는 도우미. 텍스트 추출(요소 선택·정규식 변환·조합 복사)과 사이트별 자동 로그인/로그아웃(AES-256-GCM 암호화·PC 간 동기화).",
   "minimum_chrome_version": "114",
   "icons": {
     "16": "icons/icon16.png",
@@ -31,6 +31,13 @@
         "mac": "Command+Shift+Y"
       },
       "description": "조합 결과를 복사 (허용한 사이트에서만 동작)"
+    },
+    "auto-login": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "등록된 사이트에서 자동 로그인 (잠금 해제 필요)"
     }
   },
   "permissions": [
