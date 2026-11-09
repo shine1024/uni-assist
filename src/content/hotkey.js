@@ -66,10 +66,26 @@
     panel = normalize(s && s.panelHotkey, DEFAULT_PANEL_COMBO);
   }
 
+  // 이 리스너는 패널 토글(F4) 때문에 모든 페이지에 심긴다.
+  // 로그인 단축키는 **등록된 사이트에서만** 가로채고, 그 외에는 키를 페이지에 그대로 넘긴다.
+  // (키 입력 시점에 동기적으로 판단해야 하므로 미리 물어 두고, 사이트 목록이 바뀌면 다시 묻는다)
+  let authTarget = false;
+  function refreshAuthTarget() {
+    chrome.runtime
+      .sendMessage({ type: "LOGIN_HOTKEY_TARGET" })
+      .then((r) => (authTarget = !!(r && r.target)))
+      .catch(() => (authTarget = false));
+  }
+  refreshAuthTarget();
+
   chrome.storage.sync.get(SETTINGS_KEY).then((bag) => applySettings(bag[SETTINGS_KEY]));
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "sync" && changes[SETTINGS_KEY]) applySettings(changes[SETTINGS_KEY].newValue);
+    if (area !== "sync") return;
+    if (changes[SETTINGS_KEY]) applySettings(changes[SETTINGS_KEY].newValue);
+    if (Object.keys(changes).some((k) => k.startsWith("ua_site_") || k === "ua_login_index")) {
+      refreshAuthTarget();
+    }
   });
 
   function fire(kind, message) {
@@ -91,7 +107,7 @@
       const hit =
         panel.enabled && combo === panel.combo
           ? { kind: "panel", msg: { type: "PANEL_TOGGLE" } }
-          : auth.enabled && combo === auth.combo
+          : auth.enabled && authTarget && combo === auth.combo
             ? { kind: "auth", msg: { type: "LOGIN_HOTKEY" } }
             : null;
       if (!hit) return;

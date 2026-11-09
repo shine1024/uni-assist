@@ -12,6 +12,7 @@ import {
   findDowngradedSites,
   findMatchingSites,
   findOriginMatchingSites,
+  isLoginHotkeyTarget,
   logoutCandidates,
   toMatchPatterns,
 } from "../lib/login-match.js";
@@ -413,6 +414,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const tabId = sender && sender.tab && sender.tab.id;
     if (!tabId) return;
     runAutoLogin({ tabId }).then(sendResponse);
+    return true;
+  }
+  if (msg.type === "LOGIN_HOTKEY_TARGET") {
+    // 콘텐츠 스크립트가 "이 페이지에서 F2 를 가로채도 되는지" 묻는다 (등록된 사이트만 true)
+    const url = (sender && (sender.url || (sender.tab && sender.tab.url))) || "";
+    loadSites()
+      .then((sites) => sendResponse({ target: isLoginHotkeyTarget(url, sites) }))
+      .catch(() => sendResponse({ target: false }));
     return true;
   }
   if (msg.type === "LOGIN_HAS_PENDING") {

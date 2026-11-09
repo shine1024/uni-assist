@@ -102,6 +102,19 @@ export function findDowngradedSites(url, sites) {
   return list.filter((s) => isDowngrade(url, s));
 }
 
+/**
+ * 페이지 내 로그인 단축키(F2)를 받아야 하는 페이지인지.
+ *
+ * 리스너는 패널 토글(F4) 때문에 모든 페이지에 심기므로, 등록되지 않은 사이트에서는
+ * 키를 가로채지 않고 페이지에 그대로 넘겨야 한다.
+ * 로그아웃은 origin 만 맞으면 동작하므로 origin 기준으로 판정하고,
+ * HTTPS 다운그레이드는 경고를 보여줘야 하므로 대상에 포함한다.
+ */
+export function isLoginHotkeyTarget(url, sites) {
+  const list = (Array.isArray(sites) ? sites : []).filter((s) => s && s.autoLogin !== false);
+  return findOriginMatchingSites(url, list).length > 0 || findDowngradedSites(url, list).length > 0;
+}
+
 // ---- 실행 후보 선정 (순수) -----------------------------------------------
 
 /**

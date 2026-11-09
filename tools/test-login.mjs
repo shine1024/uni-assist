@@ -21,6 +21,7 @@ import {
   findMatchingSites,
   findOriginMatchingSites,
   isDowngrade,
+  isLoginHotkeyTarget,
   isValidSelector,
   normalizePath,
   parseTarget,
@@ -142,6 +143,19 @@ eq(
   "경로가 긴 사이트가 먼저"
 );
 eq(findMatchingSites("https://zzz.com/", [siteOrigin, sitePath]).length, 0, "일치 없음");
+
+console.log("login-match: isLoginHotkeyTarget (F2 는 등록된 사이트에서만)");
+{
+  const reg = { id: "r", origin: "https://a.com", path: "/app/login", matchPath: true };
+  eq(isLoginHotkeyTarget("https://a.com/app/login", [reg]), true, "등록된 로그인 페이지");
+  eq(isLoginHotkeyTarget("https://a.com/other", [reg]), true, "같은 origin 의 다른 경로(로그아웃)");
+  eq(isLoginHotkeyTarget("https://b.com/", [reg]), false, "등록되지 않은 사이트는 대상 아님");
+  eq(isLoginHotkeyTarget("https://a.com:8443/", [reg]), false, "포트가 다르면 대상 아님");
+  eq(isLoginHotkeyTarget("http://a.com/", [reg]), true, "HTTPS 다운그레이드는 경고를 위해 대상");
+  eq(isLoginHotkeyTarget("https://a.com/", [{ ...reg, autoLogin: false }]), false, "자동 로그인 꺼진 사이트는 대상 아님");
+  eq(isLoginHotkeyTarget("https://a.com/", []), false, "사이트가 없으면 대상 아님");
+  eq(isLoginHotkeyTarget("chrome://extensions", [reg]), false, "http(s) 가 아니면 대상 아님");
+}
 
 console.log("login-match: findOriginMatchingSites (로그아웃 — 경로 무관)");
 // 재현된 버그: 로그인 페이지 경로로 등록하면 로그인 후 다른 경로에서 매칭이 깨졌다
