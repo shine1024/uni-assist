@@ -7,6 +7,7 @@
 |---|---|
 | 🔤 텍스트 추출 | 여러 요소에서 텍스트 추출 → 정규식 가공 → 조합 → 복사 (+ 허용 사이트 전용 단축키 복사) |
 | 🔐 자동 로그인 | 사이트별 ID/PW 등록 → 단축키(기본 `F2`) 한 번으로 **로그인, 로그인 상태면 로그아웃**. AES-256-GCM 암호화 + PC 간 동기화 |
+| 🔑 2차 인증 OTP | 메일함에서 **2차 인증번호를 가져와** 복사하거나 현재 탭에 입력 (Native Messaging) |
 | ⚙ 설정 | 마스터 비밀번호·자동 잠금, 동기화 상태, 단축키 |
 
 패널 열기/닫기는 **`F4`** 입니다 (설정에서 변경 가능).
@@ -165,7 +166,7 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
 | 비밀번호 취급 | 평문 저장·콘솔 출력 없음, 복사 기능 없음, 저장 직후 메모리에서 폐기, 비밀번호 입력창의 기존 값은 추출 대상에서 제외 |
 | 동기화 경합 방지 | 사이트는 동기화됐는데 금고 정보가 아직 안 온 상태에서는 **"최초 설정"을 차단** (새 금고로 덮어쓰면 기존 암호문을 영구히 잃음) |
 | 원인 진단 | 암호문마다 **키 지문**(키 SHA-256 앞 6바이트)을 기록해, 복호화 실패 시 "손상"과 "다른 마스터 비밀번호로 암호화됨"을 구분 |
-| 추가 인증 | CAPTCHA·MFA·Passkey는 **우회하지 않습니다**. 1차 자격증명 입력까지만 자동화 |
+| 추가 인증 | 자동 로그인 메뉴는 CAPTCHA·MFA·Passkey를 **다루지 않고** 1차 자격증명까지만 자동화. 메일 인증번호 입력은 **🔑 2차 인증 OTP 메뉴에서 버튼을 눌렀을 때만** 수행 |
 
 > ⚠ 마스터 비밀번호는 어디에도 저장되지 않습니다. **분실하면 저장된 비밀번호를 복구할 수 없습니다.**
 > 변경 시에는 저장된 모든 비밀번호를 새 키로 다시 암호화합니다.
@@ -181,6 +182,56 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
   필요하면 Chrome 공식 문서가 안내하는 매니페스트 `key` 필드로 ID를 고정하세요.
 - 용량 제한(Chrome 공식): 전체 **100KB**, 항목당 **8KB**, 최대 512항목. 사이트 1개 = sync 항목 1개로 나눠 저장합니다.
   설정 → 동기화 카드에서 현재 사용량을 볼 수 있습니다.
+
+## 2차 인증 OTP 가져오기
+
+사이드 패널 **🔑 2차 인증 OTP → 인증번호 확인** 을 누르면 가장 최근 인증 메일의 번호와 수신 시각을 보여 줍니다.
+
+- **📋 복사**: 인증번호를 클립보드에 복사합니다.
+- **입력 후 확인**: 현재 탭의 `input.fid-authPass` 에 입력하고 `.bid-confirm` 을 누릅니다.
+
+이전 메일의 번호일 수 있으니 수신 시각을 확인하세요. 셀렉터는 `src/lib/approval-config.js` 에 있고, 고친 뒤에는 `chrome://extensions` 에서 확장을 새로고침합니다.
+
+크롬 확장은 POP3 에 직접 접속할 수 없어, 로컬 Node 프로그램(`host/`)을 Native Messaging 으로 호출합니다.
+호스트를 설치하지 않아도 다른 기능은 그대로 동작합니다.
+
+### 설치 (macOS / Windows 각 PC에서 1회)
+
+Node.js 20.11 이상이 필요합니다. 설치 중 입력할 **확장 ID** 는 사이드 패널 **🔑 2차 인증 OTP** 메뉴에 표시됩니다.
+
+```bash
+bash install/install-mac.sh                                          # macOS
+powershell -ExecutionPolicy Bypass -File install\install-win.ps1     # Windows
+```
+
+스크립트가 의존성 설치, 호스트 등록, 메일 비밀번호의 OS 키체인 저장(입력 숨김)을 처리합니다.
+제거는 macOS `--uninstall`, Windows `-Uninstall` 입니다. Node 를 업그레이드했거나 폴더를 옮겼다면 다시 실행하세요.
+
+### 설정 (`host/config.json`)
+
+| 값 | 내용 |
+|---|---|
+| `pop3.host` / `pop3.user` | POP3 호스트와 메일 계정. 한비로는 **전체 메일 주소**를 씁니다 |
+| `otp.from` | 인증 메일 발신 주소 |
+| `otp.subjectPattern` | 제목 **정규식**. `[`, `]` 는 `\\[`, `\\]` 로 이스케이프합니다 |
+| `otp.codePattern` | 본문에서 번호를 찾는 정규식 |
+
+`host/config.json` 은 사내 정보가 저장소에 올라가지 않도록 git 에서 제외했습니다. PC마다 따로 채웁니다.
+비밀번호는 키체인에만 저장하며 이 파일에 넣지 않습니다.
+
+### 문제 해결
+
+| 안내 | 조치 |
+|---|---|
+| 호스트에 연결하지 못했어요 | 설치 스크립트 실행, 확장 ID 일치 확인 |
+| 키체인에 메일 비밀번호가 없어요 | 설치 스크립트로 등록 |
+| 메일 로그인에 실패했어요 | `pop3.user` 가 전체 주소인지 확인, 비밀번호 재등록 (`node host/setup-credentials.js`) |
+| 메일 서버에 접속하지 못했어요 | 호스트 주소, 995 포트, 사내망·VPN, 인증서 확인 |
+| 최근 메일에서 인증 메일을 찾지 못했어요 | 발신 주소, 제목 패턴의 대괄호 이스케이프 확인 |
+| 입력칸·확인 버튼을 찾지 못했어요 | 인증번호 화면 탭이 활성 상태인지, `approval-config.js` 셀렉터가 맞는지 확인 |
+
+메일 서버의 "가져간 메일 삭제" 설정은 꺼 두어야 합니다. 이 도구는 메일을 지우지 않지만 서버 설정까지 막을 수는 없습니다.
+사용 전 사내 보안 정책상 2차 인증 자동화가 허용되는지 확인하세요.
 
 ## 폴더 구조
 
@@ -210,19 +261,24 @@ uni-assist/
 ├─ tools/
 │  ├─ make_icons.py           # 아이콘 생성기 (의존성 없음)
 │  ├─ test-transform.mjs      # 텍스트 추출 로직 테스트 (18종)
-│  ├─ test-login.mjs          # 암호화·키 지문 + URL 매칭 (57종)
+│  ├─ test-login.mjs          # 암호화·키 지문 + URL 매칭 (65종)
 │  ├─ test-vault.mjs          # 저장소·마스터 비밀번호·동기화 가드 (가짜 chrome.storage, 62종)
 │  ├─ test-hotkey.mjs         # 단축키 조합·후보 선정·매치 패턴 + 복제 로직 동기화 (60종)
+│  ├─ test-approval-flow.mjs  # 2차 인증 OTP 입력·호스트 포트 (38종)
+│  ├─ test-host-pop3.mjs      # POP3 조회·인증번호 추출 (50종, host 의존성 필요)
+│  ├─ test-host-protocol.mjs  # Native Messaging 프로토콜 (26종, host 의존성 필요)
 │  └─ test-all.mjs            # 전체 실행
+├─ host/                      # 2차 인증 OTP Native Messaging 호스트 (Node.js)
+├─ install/                   # 호스트 설치 스크립트 (macOS / Windows)
 └─ docs/                      # 개발 이력 / 작업 세션 관리 → docs/CONTINUE-HERE.md 참고
 ```
 
 ## 테스트
 
 ```bash
-node tools/test-all.mjs          # 전체 (197종)
+node tools/test-all.mjs          # 전체 (319종, host/ 에서 npm ci 후)
 node tools/test-transform.mjs    # 텍스트 추출만 (18종)
-node tools/test-login.mjs        # 암호화·키 지문·URL 매칭 (57종)
+node tools/test-login.mjs        # 암호화·키 지문·URL 매칭 (65종)
 node tools/test-vault.mjs        # 저장소·잠금·마스터 변경·동기화 가드 (62종)
 node tools/test-hotkey.mjs       # 단축키·실행 후보 선정 (60종)
 ```

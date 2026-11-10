@@ -1,0 +1,12 @@
+{
+  "pop3": {
+    "host": "TODO",
+    "port": 995,
+    "user": "TODO"
+  },
+  "otp": {
+    "from": "TODO",
+    "subjectPattern": "TODO",
+    "codePattern": "인증번호\\D*(\\d{8})\\b"
+  }
+}

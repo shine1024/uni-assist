@@ -13,6 +13,8 @@
 | 콘텐츠 스크립트 | `src/content/picker.js`, `picker.css` | 요소 선택·하이라이트·텍스트 추출·페이지 토스트 (두 기능 공용) |
 | 콘텐츠 스크립트(로그인) | `src/content/autofill.js`, `autofill.css` | **자동 로그인/로그아웃 전용** — 상태 판별·값 주입·버튼 클릭·계정 선택 오버레이 |
 | 콘텐츠 스크립트(단축키) | `src/content/hotkey.js` | **페이지 내 단축키** 수신 — `F2`(로그인/로그아웃), `F4`(패널 토글). 동적 등록(상주) |
+| 2차 인증 OTP | `src/background/approval*.js`, `src/lib/approval-flow.js`, `approval-config.js`, `src/sidepanel/approval.js` | 호스트 포트(크롬 비의존) + 크롬 연결부 + 셀렉터 + 패널 화면 |
+| 네이티브 호스트 | `host/*` | Chrome 이 실행하는 Node 프로그램. POP3 인증번호 조회, OS 키체인 읽기 |
 | 오프스크린 | `src/offscreen/*` | 서비스 워커 대신 클립보드에 복사(`CLIPBOARD` 사유) |
 | 순수 로직 | `src/lib/transform.js`, `match.js`, `crypto.js`, `login-match.js`, `hotkey.js` | 변환·조합 / 복사용 URL 패턴 / 암·복호 / 로그인용 origin·경로 매칭·매치 패턴 / 키 조합 정규화. 크롬 API 비의존 → 테스트 용이 |
 | 크롬 의존 로직 | `src/lib/login-store.js`, `vault.js`, `tabs.js` | sync 저장(분할) / 마스터 비밀번호·잠금 세션 / 탭·주입 헬퍼 |

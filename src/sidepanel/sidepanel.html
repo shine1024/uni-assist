@@ -18,6 +18,7 @@
     <nav class="nav" id="nav">
       <button class="nav-btn active" data-view="extract">🔤 텍스트 추출</button>
       <button class="nav-btn" data-view="login">🔐 자동 로그인</button>
+      <button class="nav-btn" data-view="approval">🔑 2차 인증 OTP</button>
       <button class="nav-btn" data-view="settings">⚙ 설정</button>
     </nav>
 
@@ -132,6 +133,38 @@
 
         <!-- 사이트 상세 (login.js 가 렌더) -->
         <section class="hidden" id="site-detail"></section>
+      </div>
+
+      <!-- ================= 2차 인증 OTP ================= -->
+      <div class="view hidden" id="view-approval">
+        <section class="feature-head">
+          <h2>🔑 2차 인증 OTP 가져오기</h2>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>메일 인증번호</h2>
+            <button id="btn-approval-otp" class="btn btn-primary btn-sm">인증번호 확인</button>
+          </div>
+          <p class="otp-code hidden" id="approval-otp-code"></p>
+          <p class="muted hint-text hidden" id="approval-otp-info"></p>
+          <div class="result-actions hidden" id="approval-otp-actions">
+            <button id="btn-approval-otp-copy" class="btn btn-ghost btn-sm">📋 복사</button>
+            <button id="btn-approval-otp-fill" class="btn btn-primary btn-sm" title="현재 탭의 인증번호 칸에 입력하고 확인 버튼을 누릅니다">입력 후 확인</button>
+          </div>
+          <p class="hint-text hidden" id="approval-otp-result"></p>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>설치 상태</h2>
+            <button id="btn-approval-check" class="btn btn-ghost btn-sm">다시 확인</button>
+          </div>
+          <ul class="kv">
+            <li><span>네이티브 호스트</span><span class="kbd" id="approval-host">…</span></li>
+            <li><span>확장 ID <span class="muted">(설치 시 입력)</span></span><code id="approval-ext-id"></code></li>
+          </ul>
+        </section>
       </div>
 
       <!-- ================= 설정 ================= -->

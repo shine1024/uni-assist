@@ -4,6 +4,7 @@ import { applyTransforms, combineResults } from "../lib/transform.js";
 import { parsePatterns } from "../lib/match.js";
 import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
 import { initLoginUI, onViewShown } from "./login.js";
+import { initApprovalUI, onApprovalShown } from "./approval.js";
 
 const DEFAULT_PATTERNS = ["https://labdev.unipost.co.kr/redmine"];
 
@@ -523,12 +524,14 @@ function toast(msg) {
 })();
 
 // ---- 메뉴(뷰) 전환 -------------------------------------------------------
-const VIEWS = ["extract", "login", "settings"];
+const VIEWS = ["extract", "login", "approval", "settings"];
+initApprovalUI();
 
 function showView(name) {
   VIEWS.forEach((v) => $(`#view-${v}`).classList.toggle("hidden", v !== name));
   $$(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   onViewShown(name); // 자동 로그인/설정 화면은 열릴 때마다 최신 상태로
+  if (name === "approval") onApprovalShown();
 }
 
 $("#nav").addEventListener("click", (e) => {

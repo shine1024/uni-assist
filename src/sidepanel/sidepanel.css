@@ -456,3 +456,6 @@ textarea { width: 100%; resize: vertical; font-family: ui-monospace, Consolas, m
 .kv .hk-row { flex: none; }
 .kv .hk-row .chk { font-size: 11px; }
 .sel-gap { margin-top: 8px; }
+
+/* 결재: 메일 인증번호 */
+.otp-code { margin: 0 0 4px; font-size: 22px; font-weight: 700; letter-spacing: 2px; user-select: all; }

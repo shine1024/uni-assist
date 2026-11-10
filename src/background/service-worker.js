@@ -18,6 +18,8 @@ import {
 } from "../lib/login-match.js";
 import { getSettings, loadSites } from "../lib/login-store.js";
 import * as vault from "../lib/vault.js";
+import { isExtensionPage } from "../lib/approval-flow.js";
+import { approvalStatus, fillOtpInActiveTab, latestApprovalOtp } from "./approval.js";
 
 const CMD = "copy-combined";
 const CMD_LOGIN = "auto-login";
@@ -374,6 +376,17 @@ async function runAutoLogin(opts = {}) {
 // ---- 사이드 패널 ↔ 서비스 워커 ------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return;
+  const approvalAction = {
+    APPROVAL_STATUS: approvalStatus,
+    APPROVAL_LATEST_OTP: latestApprovalOtp,
+    APPROVAL_FILL_OTP: () => fillOtpInActiveTab(msg.code),
+  }[msg.type];
+  if (approvalAction) {
+    // 인증번호를 다루므로 웹페이지에 주입된 스크립트에서는 호출할 수 없게 한다.
+    if (!isExtensionPage(sender, chrome.runtime.id)) return;
+    approvalAction().then(sendResponse);
+    return true;
+  }
   if (msg.type === "LOGIN_RUN") {
     runAutoLogin({ siteId: msg.siteId, accountId: msg.accountId, tabId: msg.tabId }).then(
       sendResponse

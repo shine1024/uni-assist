@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Uni-Assist 도우미",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "웹 업무 생산성을 돕는 도우미. 텍스트 추출(요소 선택·정규식 변환·조합 복사)과 사이트별 자동 로그인/로그아웃(AES-256-GCM 암호화·PC 간 동기화).",
   "minimum_chrome_version": "114",
   "icons": {
@@ -47,7 +47,8 @@
     "tabs",
     "activeTab",
     "offscreen",
-    "clipboardWrite"
+    "clipboardWrite",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"

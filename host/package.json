@@ -1,0 +1,19 @@
+{
+  "name": "uni-assist-approval-host",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Uni-Assist 결재 로그인용 Native Messaging 호스트 (POP3 인증번호 조회)",
+  "type": "module",
+  "engines": {
+    "node": "^20.11.0 || >=22.0.0"
+  },
+  "scripts": {
+    "test": "node ../tools/test-host-pop3.mjs",
+    "cli-test": "node cli-test.js"
+  },
+  "dependencies": {
+    "@napi-rs/keyring": "2.1.2",
+    "mailparser": "3.14.3",
+    "node-pop3": "0.15.3"
+  }
+}
