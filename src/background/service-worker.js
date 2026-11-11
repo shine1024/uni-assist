@@ -28,7 +28,9 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((err) => console.error("[uni-assist] setPanelBehavior 실패:", err));
-  syncHotkeyRegistration();
+  // 등록한 콘텐츠 스크립트는 이후 새로 열리는 페이지에만 들어간다.
+  // 설치·업데이트·다시 불러오기 직후에도 이미 열린 탭에서 F2/F4 가 바로 되도록 직접 심는다.
+  syncHotkeyRegistration().then(injectHotkeyIntoOpenTabs);
 });
 
 chrome.runtime.onStartup.addListener(() => syncHotkeyRegistration());
@@ -531,6 +533,24 @@ async function syncHotkeyRegistration() {
       console.error("[uni-assist] 페이지 내 단축키 등록 실패:", e2.message);
     }
   }
+}
+
+async function injectHotkeyIntoOpenTabs() {
+  let reg;
+  try {
+    [reg] = await chrome.scripting.getRegisteredContentScripts({ ids: [HOTKEY_SCRIPT_ID] });
+  } catch (_) {
+    return;
+  }
+  if (!reg) return; // 단축키가 모두 꺼져 있음
+  const tabs = await chrome.tabs.query({ url: reg.matches }).catch(() => []);
+  await Promise.all(
+    tabs.map((tab) =>
+      chrome.scripting
+        .executeScript({ target: { tabId: tab.id }, files: ["src/content/hotkey.js"] })
+        .catch(() => {}) // 크롬 웹스토어 등 주입할 수 없는 페이지
+    )
+  );
 }
 
 // 사이트/설정이 바뀌면(이 PC에서든 동기화로든) 등록을 갱신

@@ -13,8 +13,18 @@
 //   (tools/test-hotkey.mjs 가 복제본이 lib 와 일치하는지 검사한다 — 한쪽만 고치면 테스트 실패)
 
 (() => {
-  if (window.__uaHotkeyLoaded) return;
-  window.__uaHotkeyLoaded = true;
+  // 등록된 스크립트와 설치 직후 기존 탭 주입(service-worker.js)이 겹칠 수 있다.
+  // 가장 나중에 심긴 것만 동작하도록 토큰을 덮어쓴다. 확장을 다시 불러온 뒤 남은 예전 리스너도
+  // 같은 이유로, 또는 런타임 연결이 끊긴 것을 보고 스스로 물러난다.
+  const token = {};
+  window.__uaHotkeyLoaded = token;
+  const active = () => {
+    try {
+      return window.__uaHotkeyLoaded === token && !!chrome.runtime.id;
+    } catch (_) {
+      return false;
+    }
+  };
 
   const SETTINGS_KEY = "ua_login_settings";
   const DEFAULT_COMBO = "F2";
@@ -100,7 +110,7 @@
   window.addEventListener(
     "keydown",
     (e) => {
-      if (e.repeat) return;
+      if (e.repeat || !active()) return;
       const combo = comboFromEvent(e);
       if (!combo) return;
 

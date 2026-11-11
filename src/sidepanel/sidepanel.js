@@ -6,6 +6,8 @@ import { parsePatterns } from "../lib/match.js";
 import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
 import { initLoginUI, onViewShown } from "./login.js";
 import { initApprovalUI, onApprovalShown } from "./approval.js";
+import { DEFAULT_PANEL_COMBO, comboFromEvent, isTypingTarget, needsTypingGuard, normalizeHotkey } from "../lib/hotkey.js";
+import { K_SETTINGS } from "../lib/login-store.js";
 
 const DEFAULT_PATTERNS = ["https://labdev.unipost.co.kr/redmine"];
 
@@ -502,6 +504,26 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.add("hidden"), 1600);
 }
+
+// ---- 패널 안에서 누른 F4 로도 닫기 ---------------------------------------
+// 패널에 포커스가 있으면 키 입력이 페이지로 가지 않아 콘텐츠 스크립트(hotkey.js)가 받지 못한다.
+// 패널 문서에서 같은 키를 받아 직접 닫는다. (키 지정 중에는 login.js 가 캡처 단계에서 먼저 가로챈다)
+(function closeOnPanelHotkey() {
+  let hotkey = normalizeHotkey(null, DEFAULT_PANEL_COMBO);
+  const apply = (s) => (hotkey = normalizeHotkey(s && s.panelHotkey, DEFAULT_PANEL_COMBO));
+  chrome.storage.sync.get(K_SETTINGS).then((bag) => apply(bag[K_SETTINGS]));
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "sync" && changes[K_SETTINGS]) apply(changes[K_SETTINGS].newValue);
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat || !hotkey.enabled) return;
+    const combo = comboFromEvent(e);
+    if (combo !== hotkey.combo) return;
+    if (needsTypingGuard(combo) && isTypingTarget(e.target)) return;
+    e.preventDefault();
+    window.close(); // 사이드 패널 문서에서 window.close() 는 패널을 닫는다
+  });
+})();
 
 // ---- 패널 열림 상태 알리기 (F4 토글용) -----------------------------------
 // sidePanel 에는 "열려 있는지" 묻는 API 가 없어서, 패널이 살아 있는 동안 포트를 연결해 둔다.
