@@ -1,4 +1,4 @@
-/* 요소 선택 모드에서 페이지에 주입되는 스타일 */
+/* 요소 선택 모드에서 페이지에 주입되는 스타일 — 사이드 패널과 같은 그래파이트 + 페리윙클(#88A6FF) */
 
 html.__ua-picking, html.__ua-picking * {
   cursor: crosshair !important;
@@ -8,11 +8,11 @@ html.__ua-picking, html.__ua-picking * {
   position: fixed;
   z-index: 2147483646;
   pointer-events: none;
-  background: rgba(45, 212, 191, 0.22);
-  border: 2px solid #14b8a6;
-  border-radius: 3px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
-  transition: all 0.04s ease-out;
+  background: rgba(136, 166, 255, 0.14);
+  border: 1.5px solid #88a6ff;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgba(27, 29, 34, 0.35), 0 0 22px -4px rgba(136, 166, 255, 0.7);
+  transition: all 0.06s ease-out;
 }
 
 .__ua-label {
@@ -20,30 +20,47 @@ html.__ua-picking, html.__ua-picking * {
   z-index: 2147483647;
   pointer-events: none;
   max-width: 60vw;
-  padding: 3px 7px;
-  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: #fff;
-  background: #0f172a;
-  border-radius: 4px;
+  padding: 4px 10px;
+  font: 500 11px/1.5 "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+  color: #eceef2;
+  background: rgba(27, 29, 34, 0.92);
+  border: 1px solid #454954;
+  border-radius: 9999px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
 }
 
 .__ua-hint {
   position: fixed;
   z-index: 2147483647;
   pointer-events: none;
-  top: 12px;
+  top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 8px 14px;
-  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: #fff;
-  background: #4f46e5;
-  border-radius: 20px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  padding: 9px 16px 9px 30px;
+  font: 500 13px/1.4 Inter, system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  color: #eceef2;
+  background: rgba(27, 29, 34, 0.9);
+  border: 1px solid #454954;
+  border-radius: 9999px;
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+}
+.__ua-hint::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 9999px;
+  background: #88a6ff;
+  box-shadow: 0 0 8px rgba(136, 166, 255, 0.8);
 }
 
 /* 단축키 복사 등 페이지 피드백 토스트 */
@@ -55,12 +72,13 @@ html.__ua-picking, html.__ua-picking * {
   left: 50%;
   transform: translate(-50%, 12px);
   padding: 10px 18px;
-  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-weight: 700;
-  color: #042f2e;
-  background: #2dd4bf;
-  border-radius: 22px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  font: 500 13px/1.4 Inter, system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  color: #eceef2;
+  background: rgba(27, 29, 34, 0.94);
+  border: 1px solid #454954;
+  border-radius: 9999px;
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
   opacity: 0;
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
@@ -69,6 +87,6 @@ html.__ua-picking, html.__ua-picking * {
   transform: translate(-50%, 0);
 }
 .__ua-toast.error {
-  color: #fff;
-  background: #f43f5e;
+  color: #f7768e;
+  border-color: rgba(247, 118, 142, 0.55);
 }

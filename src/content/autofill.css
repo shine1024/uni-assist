@@ -1,4 +1,4 @@
-/* 자동 로그인 — 계정 선택 오버레이 (페이지에 주입) */
+/* 자동 로그인 — 계정 선택 오버레이 (페이지에 주입). 사이드 패널과 같은 그래파이트 + 페리윙클(#88A6FF) */
 
 .__ua-af-backdrop {
   position: fixed;
@@ -7,27 +7,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(2, 6, 23, 0.55);
-  backdrop-filter: blur(1px);
+  background: rgba(12, 13, 16, 0.55);
+  backdrop-filter: blur(4px);
 }
 
 .__ua-af-box {
   width: min(340px, 86vw);
   max-height: 70vh;
   overflow: auto;
-  padding: 14px;
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-  font: 13px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  padding: 16px;
+  background: #25282f;
+  color: #eceef2;
+  border: 1px solid #33363f;
+  border-radius: 16px;
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  font: 13px/1.5 Inter, system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
 }
 
 .__ua-af-head {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .__ua-af-list {
@@ -42,43 +42,47 @@
   justify-content: flex-start;
   gap: 8px;
   width: 100%;
-  padding: 9px 11px;
+  padding: 10px 12px;
   font: inherit;
   text-align: left;
-  color: #e2e8f0;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 7px;
+  color: #eceef2;
+  background: #1e2026;
+  border: 1px solid #33363f;
+  border-radius: 10px;
   cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
 .__ua-af-item:hover,
 .__ua-af-item:focus {
   outline: none;
-  border-color: #6366f1;
-  background: #273449;
+  border-color: #88a6ff;
+  background: #1e2026;
+  box-shadow: 0 0 0 3px rgba(136, 166, 255, 0.14);
 }
-.__ua-af-item-name { flex: 1; min-width: 0; font-weight: 600; }
-.__ua-af-item-sub { color: #94a3b8; font-size: 12px; }
+.__ua-af-item-name { flex: 1; min-width: 0; font-weight: 500; }
+.__ua-af-item-sub { color: rgba(236, 238, 242, 0.64); font-size: 12px; }
 
 .__ua-af-foot {
-  margin-top: 10px;
-  color: #94a3b8;
+  margin-top: 12px;
+  color: rgba(236, 238, 242, 0.5);
   font-size: 11px;
   text-align: right;
 }
 
 .__ua-af-item-num {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   margin-right: 2px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #94a3b8;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 4px;
+  font: 500 11px/1 "Geist Mono", "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color: rgba(236, 238, 242, 0.64);
+  background: transparent;
+  border: 1px solid #454954;
+  border-radius: 9999px;
 }
-.__ua-af-item:focus .__ua-af-item-num { color: #e2e8f0; border-color: #6366f1; }
+.__ua-af-item:focus .__ua-af-item-num {
+  color: #88a6ff;
+  border-color: #88a6ff;
+}
