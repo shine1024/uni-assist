@@ -217,6 +217,8 @@ powershell -ExecutionPolicy Bypass -File install\install-win.ps1     # Windows
 | `otp.codePattern` | 본문에서 번호를 찾는 정규식 |
 
 `host/config.json` 은 사내 정보가 저장소에 올라가지 않도록 git 에서 제외했습니다. PC마다 따로 채웁니다.
+`config.example.json` 에 사내 공통값(호스트·발신 주소·제목·번호 패턴)이 들어 있으니 복사한 뒤 `pop3.user` 만 본인 메일 주소로 바꾸면 됩니다.
+제목 패턴 예: `"\\[유니포스트\\] 로그인 2차 인증 번호 발급 안내"` — 대괄호를 이스케이프하지 않으면 어떤 메일과도 일치하지 않습니다.
 비밀번호는 키체인에만 저장하며 이 파일에 넣지 않습니다.
 
 ### 문제 해결

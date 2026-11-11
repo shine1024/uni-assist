@@ -1,12 +1,12 @@
 {
   "pop3": {
-    "host": "TODO",
+    "host": "unipost.hanbiro.net",
     "port": 995,
     "user": "TODO"
   },
   "otp": {
-    "from": "TODO",
-    "subjectPattern": "TODO",
+    "from": "no-reply@unipost.co.kr",
+    "subjectPattern": "\\[유니포스트\\] 로그인 2차 인증 번호 발급 안내",
     "codePattern": "인증번호\\D*(\\d{8})\\b"
   }
 }
