@@ -38,9 +38,12 @@ echo "1/4 의존성 설치"
 [[ -f "$HOST_DIR/config.json" ]] || cp "$HOST_DIR/config.example.json" "$HOST_DIR/config.json"
 
 echo
+# manifest.json 의 key 로 고정된 ID. 다른 ID 로 설치했을 때만 직접 입력한다.
+DEFAULT_EXTENSION_ID="fjmhmlhmfiomcjplmoehjmjbfeehhmmj"
 echo "2/4 확장 ID 입력"
-echo "    chrome://extensions 의 Uni-Assist 도우미 카드에 표시된 ID 를 붙여 넣으세요."
+echo "    Enter 를 누르면 고정 ID($DEFAULT_EXTENSION_ID)를 씁니다."
 read -r -p "확장 ID: " EXTENSION_ID
+EXTENSION_ID="${EXTENSION_ID:-$DEFAULT_EXTENSION_ID}"
 
 echo "3/4 호스트 등록"
 # Chrome 은 셸 PATH 를 읽지 않으므로 node 절대경로로 실행한다.

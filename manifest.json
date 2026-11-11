@@ -4,6 +4,7 @@
   "version": "0.5.0",
   "description": "웹 업무 생산성을 돕는 도우미. 텍스트 추출(요소 선택·정규식 변환·조합 복사)과 사이트별 자동 로그인/로그아웃(AES-256-GCM 암호화·PC 간 동기화).",
   "minimum_chrome_version": "114",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+HXXt67hMnEIIgvkExzXO0FAbr5wXo3YDw/qr9ZyljX+D+lgqMmx5NNUqtuN16104NWonDEM/W6pdBdB/YD8GIY19iGQ9s6XifMNpTDCUJ9kTMmNsJ/to+5HsGYV879QZEVcoiviZo8RUrXEUaM9effFcxEAiiSgljTwPujkBomhV05Bxe8bZsiAlvJXc3rvfbUbIX37WFSDqbLp88o2TLO5WuGv8UBRvTUfMY4Y94ymK0wmyvFFeR4la1T81kmivA+vNO7CYx2i2iprchX8xDS2Ud1/n3dqWcso1IWMaoDP8PLr/Q0qnyiwvOU0mwlDFdak6Kug831N80Fstwui6wIDAQAB",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

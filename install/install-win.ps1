@@ -55,9 +55,12 @@ $Config = Join-Path $HostDir "config.json"
 if (-not (Test-Path $Config)) { Copy-Item (Join-Path $HostDir "config.example.json") $Config }
 
 Write-Host ""
+# Fixed by the "key" in manifest.json. Type another ID only if you installed it differently.
+$DefaultExtensionId = "fjmhmlhmfiomcjplmoehjmjbfeehhmmj"
 Write-Host "2/4 Extension ID"
-Write-Host "    Copy the ID shown on the Uni-Assist card in chrome://extensions."
+Write-Host "    Press Enter to use the fixed ID ($DefaultExtensionId)."
 $ExtensionId = (Read-Host "Extension ID").Trim()
+if (-not $ExtensionId) { $ExtensionId = $DefaultExtensionId }
 
 Write-Host "3/4 Registering host"
 # Chrome does not read the shell PATH reliably, so call node by absolute path.
