@@ -2,6 +2,7 @@
 // 실행: node tools/test-host-protocol.mjs  (먼저 host/ 에서 npm ci)
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createDispatcher } from "../host/dispatch.js";
 import { MAX_MESSAGE_BYTES, createFrameReader, encodeFrame } from "../host/framing.js";
 import { Pop3Error } from "../host/pop3.js";
@@ -122,7 +123,7 @@ for (const file of ["host.js", "dispatch.js", "framing.js", "credentials.js", "p
 
 console.log("실제 호스트 프로세스");
 {
-  const child = spawn(process.execPath, [new URL("../host/host.js", import.meta.url).pathname], {
+  const child = spawn(process.execPath, [fileURLToPath(new URL("../host/host.js", import.meta.url))], {
     stdio: ["pipe", "pipe", "pipe"],
   });
   const received = [];
