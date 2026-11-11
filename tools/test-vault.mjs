@@ -75,7 +75,7 @@ const NEW_MASTER = "new-master-9876";
 console.log("vault: 초기 상태");
 eq(await vault.isInitialized(), false, "처음에는 미설정");
 eq((await vault.status()).unlocked, false, "처음에는 잠김");
-eq((await vault.status()).autoLockMinutes, 30, "기본 자동 잠금 30분");
+eq((await vault.status()).autoLockMinutes, 60, "기본 자동 잠금 1시간");
 eq(await vault.getUnlockedKey(), null, "미설정 상태에서 키 없음");
 
 console.log("vault: 최초 설정");
@@ -143,23 +143,29 @@ eq(big.includes("너무 큽니다"), true, "항목 8KB 초과 시 사용자용 �
 // ---- 설정 병합 ------------------------------------------------------------
 console.log("login-store: 설정 기본값 / 부분 저장");
 const defs = await store.getSettings();
-eq(defs.autoLockMinutes, 30, "자동 잠금 기본 30분");
+eq(defs.autoLockMinutes, 60, "자동 잠금 기본 1시간");
 eq(defs.hotkey, { combo: "F2", enabled: true }, "로그인 단축키 기본 F2");
 eq(defs.panelHotkey, { combo: "F4", enabled: true }, "패널 단축키 기본 F4");
 eq(defs.hotkeyAllSites, true, "기본은 모든 사이트에서 단축키 사용");
 
 // 중첩 객체가 다른 설정 변경에 휩쓸려 날아가지 않아야 한다
 await store.setSettings({ panelHotkey: { combo: "F9", enabled: true } });
-await store.setSettings({ autoLockMinutes: 15 });
+await store.setSettings({ autoLockMinutes: 240 });
 const merged = await store.getSettings();
 eq(merged.panelHotkey, { combo: "F9", enabled: true }, "다른 설정을 바꿔도 패널 단축키 유지");
 eq(merged.hotkey, { combo: "F2", enabled: true }, "저장 안 한 단축키는 기본값 유지");
-eq(merged.autoLockMinutes, 15, "자동 잠금 변경 반영");
+eq(merged.autoLockMinutes, 240, "자동 잠금 변경 반영");
+await store.setSettings({ autoLockMinutes: 15 });
+eq((await store.getSettings()).autoLockMinutes, 60, "이전 버전 값(15분)은 1시간으로 올림");
+await store.setSettings({ autoLockMinutes: 300 });
+eq((await store.getSettings()).autoLockMinutes, 480, "선택지 사이 값은 바로 위 선택지로");
+await store.setSettings({ autoLockMinutes: 9999 });
+eq((await store.getSettings()).autoLockMinutes, 480, "최대 8시간");
 
 // 부분 저장(enabled 만) 시에도 combo 가 보존돼야 한다
 await store.setSettings({ panelHotkey: { ...merged.panelHotkey, enabled: false } });
 eq((await store.getSettings()).panelHotkey, { combo: "F9", enabled: false }, "combo 보존 + enabled 변경");
-await store.setSettings({ panelHotkey: { combo: "F4", enabled: true }, autoLockMinutes: 30 });
+await store.setSettings({ panelHotkey: { combo: "F4", enabled: true }, autoLockMinutes: 60 });
 
 console.log("login-store: 신규 사이트 기본값");
 const fresh = store.newSite();
@@ -183,10 +189,10 @@ eq(await vault.getUnlockedKey(), null, "만료된 세션은 접근 시점에 폐
 eq((await session.get("ua_unlock")).ua_unlock, undefined, "만료 세션이 실제로 삭제됨");
 
 await vault.unlock(MASTER);
-await store.setSettings({ autoLockMinutes: 5 });
+await store.setSettings({ autoLockMinutes: 480 });
 await vault.touchUnlock();
 const after = (await session.get("ua_unlock")).ua_unlock;
-eq(after.expiresAt - Date.now() > 4 * 60000, true, "touchUnlock 이 새 간격(5분)으로 연장");
+eq(after.expiresAt - Date.now() > 470 * 60000, true, "touchUnlock 이 새 간격(8시간)으로 연장");
 
 // ---- 마스터 비밀번호 변경 (전체 재암호화) --------------------------------
 console.log("vault: 마스터 비밀번호 변경");

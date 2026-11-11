@@ -233,7 +233,7 @@ state = {
 ua_login_index    = { schemaVersion, siteIds: [id…], updatedAt }
 ua_vault          = { schemaVersion, kdf:"PBKDF2-SHA256", iterations, salt, verifier:{iv,ct}, updatedAt }
 ua_login_settings = {
-  autoLockMinutes,                               // 기본 30
+  autoLockMinutes,                               // 기본 60 (60·240·480)
   hotkey:      { combo, enabled },               // 기본 { "F2", true } — 로그인/로그아웃
   panelHotkey: { combo, enabled },               // 기본 { "F4", true } — 패널 열기/닫기
   hotkeyAllSites                                 // 기본 true — 모든 http(s) 페이지에 리스너

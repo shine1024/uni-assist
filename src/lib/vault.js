@@ -124,8 +124,7 @@ export async function lock() {
 }
 
 async function startSession(key) {
-  const { autoLockMinutes } = await getSettings();
-  const mins = Number(autoLockMinutes) > 0 ? Number(autoLockMinutes) : 30;
+  const { autoLockMinutes: mins } = await getSettings();
   await chrome.storage.session.set({
     [S_UNLOCK]: { keyB64: await exportKeyB64(key), expiresAt: Date.now() + mins * 60000 },
   });
@@ -135,8 +134,7 @@ async function startSession(key) {
 export async function touchUnlock() {
   const { [S_UNLOCK]: sess } = await chrome.storage.session.get(S_UNLOCK);
   if (!sess || !sess.keyB64) return;
-  const { autoLockMinutes } = await getSettings();
-  const mins = Number(autoLockMinutes) > 0 ? Number(autoLockMinutes) : 30;
+  const { autoLockMinutes: mins } = await getSettings();
   await chrome.storage.session.set({
     [S_UNLOCK]: { ...sess, expiresAt: Date.now() + mins * 60000 },
   });

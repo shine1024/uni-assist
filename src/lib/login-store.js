@@ -23,8 +23,17 @@ export const MAX_TOTAL_BYTES = 102400;
 //  hotkeyAllSites: 리스너를 모든 http(s) 페이지에 심을지(기본), 아니면 등록된 사이트에만 심을지.
 //   · 켜짐 → 패널 토글(F4)을 어디서든 쓸 수 있다
 //   · 꺼짐 → 등록된 로그인 사이트에서만 단축키가 동작한다(리스너 범위 최소화)
+// 자동 잠금 선택지(분). 목록에 없는 값(이전 버전의 5·15·30분 등)은 바로 위 선택지로 올린다.
+export const AUTO_LOCK_OPTIONS = [60, 240, 480];
+
+export function normalizeAutoLock(value) {
+  const mins = Number(value);
+  if (!(mins > 0)) return AUTO_LOCK_OPTIONS[0];
+  return AUTO_LOCK_OPTIONS.find((o) => o >= mins) ?? AUTO_LOCK_OPTIONS[AUTO_LOCK_OPTIONS.length - 1];
+}
+
 export const DEFAULT_SETTINGS = {
-  autoLockMinutes: 30,
+  autoLockMinutes: 60,
   hotkey: { combo: "F2", enabled: true }, // 로그인 / 로그아웃
   panelHotkey: { combo: "F4", enabled: true }, // 사이드 패널 열기·닫기
   hotkeyAllSites: true,
@@ -167,6 +176,7 @@ export async function getSettings() {
   return {
     ...DEFAULT_SETTINGS,
     ...(s || {}),
+    autoLockMinutes: normalizeAutoLock(s ? s.autoLockMinutes : undefined),
     hotkey: { ...DEFAULT_SETTINGS.hotkey, ...((s && s.hotkey) || {}) },
     panelHotkey: { ...DEFAULT_SETTINGS.panelHotkey, ...((s && s.panelHotkey) || {}) },
   };
