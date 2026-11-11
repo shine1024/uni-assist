@@ -13,8 +13,8 @@
 | 콘텐츠 스크립트 | `src/content/picker.js`, `picker.css` | 요소 선택·하이라이트·텍스트 추출·페이지 토스트 (두 기능 공용) |
 | 콘텐츠 스크립트(로그인) | `src/content/autofill.js`, `autofill.css` | **자동 로그인/로그아웃 전용** — 상태 판별·값 주입·버튼 클릭·계정 선택 오버레이 |
 | 콘텐츠 스크립트(단축키) | `src/content/hotkey.js` | **페이지 내 단축키** 수신 — `F2`(로그인/로그아웃), `F4`(패널 토글). 동적 등록(상주) |
-| 2차 인증 OTP | `src/background/approval*.js`, `src/lib/approval-flow.js`, `approval-config.js`, `src/sidepanel/approval.js` | 호스트 포트(크롬 비의존) + 크롬 연결부 + 셀렉터 + 패널 화면 |
-| 네이티브 호스트 | `host/*` | Chrome 이 실행하는 Node 프로그램. POP3 인증번호 조회, OS 키체인 읽기 |
+| 2차 인증 OTP | `src/background/approval*.js`, `src/lib/slack-otp.js`, `approval-flow.js`, `approval-config.js`, `src/sidepanel/approval.js` | 슬랙 DM 조회·번호 추출·OAuth(크롬 비의존) + 크롬 연결부(조회 1회·사용 표시·자동 입력 등록) + 설정값 + 패널 화면(슬랙 연결·3분 대기) |
+| 콘텐츠 스크립트(2차 인증) | `src/content/otp-auto.js` | 포털 인증 화면 자동 입력. 설정에서 켜고 슬랙이 연결돼 있을 때만 동적 등록. 토큰은 받지 않고 번호만 받는다 |
 | 오프스크린 | `src/offscreen/*` | 서비스 워커 대신 클립보드에 복사(`CLIPBOARD` 사유) |
 | 순수 로직 | `src/lib/transform.js`, `match.js`, `crypto.js`, `login-match.js`, `hotkey.js` | 변환·조합 / 복사용 URL 패턴 / 암·복호 / 로그인용 origin·경로 매칭·매치 패턴 / 키 조합 정규화. 크롬 API 비의존 → 테스트 용이 |
 | 크롬 의존 로직 | `src/lib/login-store.js`, `vault.js`, `tabs.js` | sync 저장(분할) / 마스터 비밀번호·잠금 세션 / 탭·주입 헬퍼 |
@@ -27,6 +27,8 @@
 - `offscreen` + `clipboardWrite` — 서비스 워커에서 클립보드 복사(오프스크린 문서)
 - `commands` (매니페스트 키) — 단축키 `copy-combined`, `auto-login` (전역)
 - 페이지 내 단축키(F2)는 권한 없이 `scripting` + 기존 `host_permissions` 로 동적 등록
+- `identity` — 2차 인증의 슬랙 OAuth(`chrome.identity.launchWebAuthFlow`, Redirect `https://<확장ID>.chromiumapp.org/`)
+- `key` (매니페스트 키) — 확장 ID 고정 `gknfpjcapdfgainlgjglmooolalpifml` — `unipost-2fa-helper` 의 key 를 이어받음(슬랙 앱 Redirect URL 이 이 ID 로 등록돼 있음). 동기화·Redirect URL 이 ID 에 묶인다
 
 > 자동 로그인은 **새 권한을 추가하지 않는다.** 기존 `storage`(+`storage.session`은 추가 권한 불필요),
 > `scripting`, `tabs`/`activeTab`, `host_permissions` 만으로 구현했다(최소 권한 원칙).

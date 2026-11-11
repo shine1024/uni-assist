@@ -1,22 +1,121 @@
-// 사이드 패널: 2차 인증 OTP 화면
+// 사이드 패널: 2차 인증 OTP 화면 (슬랙 DM 에서 인증번호 가져오기)
+import { APPROVAL_CONFIG } from "../lib/approval-config.js";
+import { ApprovalError, messageForError } from "../lib/approval-flow.js";
+import { buildAuthUrl, createSlackClient, exchangeCode, parseAuthRedirect, validateSlackConfig } from "../lib/slack-otp.js";
 
 const $ = (selector) => document.querySelector(selector);
+const K_SLACK = "ua_slack"; // background/approval.js 와 같은 키
 
-let currentCode = "";
+let current = null; // { code, ts }
+let waiting = null; // { cancelled }
+
+// ---- 슬랙 연결 ------------------------------------------------------------
 
 async function refreshStatus() {
-  $("#approval-ext-id").textContent = chrome.runtime.id;
-  $("#approval-host").textContent = "확인 중…";
-  const status = await chrome.runtime.sendMessage({ type: "APPROVAL_STATUS" }).catch(() => null);
-  $("#approval-host").textContent = status && status.hostOk ? `연결됨 v${status.version}` : "미설치";
+  const st = await chrome.runtime.sendMessage({ type: "APPROVAL_STATUS" }).catch(() => null);
+  if (!st) return;
+  $("#slack-status").textContent = st.connected ? "연결됨" : "연결 안 됨";
+  $("#slack-status").classList.toggle("on", st.connected);
+  $("#slack-user").textContent = st.connected ? `${st.user}${st.team ? ` · ${st.team}` : ""}` : "—";
+  $("#slack-redirect").textContent = st.redirectUrl;
+  $("#slack-config-hint").classList.toggle("hidden", st.configured);
+  $("#btn-slack-connect").classList.toggle("hidden", st.connected);
+  $("#btn-slack-connect").disabled = !st.configured;
+  $("#btn-slack-disconnect").classList.toggle("hidden", !st.connected);
+  $("#slack-token-box").classList.toggle("hidden", st.connected);
+  $("#otp-autofill").checked = st.autoFill;
+  $("#otp-autofill").disabled = !st.connected;
 }
 
+function showSlackError(err) {
+  const el = $("#slack-error");
+  el.textContent = err ? messageForError(err) : "";
+  el.classList.toggle("hidden", !err);
+}
+
+async function connectSlack() {
+  const button = $("#btn-slack-connect");
+  button.disabled = true;
+  showSlackError(null);
+  try {
+    let raw = null;
+    try {
+      raw = await (await fetch(chrome.runtime.getURL("slack-config.json"))).json();
+    } catch {
+      /* 파일 없음 → 아래에서 안내 */
+    }
+    const { clientId, clientSecret } = validateSlackConfig(raw);
+    const redirectUri = chrome.identity.getRedirectURL();
+    const state = crypto.randomUUID();
+
+    let redirected;
+    try {
+      redirected = await chrome.identity.launchWebAuthFlow({
+        url: buildAuthUrl({ clientId, redirectUri, state }),
+        interactive: true,
+      });
+    } catch (e) {
+      // 창을 닫았거나, 슬랙이 오류 화면(예: redirect_uri 불일치)을 보여 주어 돌아오지 못한 경우
+      throw new ApprovalError("SLACK_AUTH_WINDOW", e && e.message);
+    }
+    const code = parseAuthRedirect(redirected, state);
+    await saveConnection(await exchangeCode({ clientId, clientSecret, code, redirectUri }));
+  } catch (err) {
+    showSlackError(err);
+  } finally {
+    button.disabled = false;
+    refreshStatus();
+  }
+}
+
+/** 토큰이 유효한지 확인하고 본인 DM 을 찾아 이 PC 에 저장한다. */
+async function saveConnection(token) {
+  const client = createSlackClient(token);
+  const me = await client.me();
+  const channelId = await client.findSelfDm(me.userId);
+  const { [K_SLACK]: prev } = await chrome.storage.local.get(K_SLACK);
+  await chrome.storage.local.set({
+    [K_SLACK]: { ...(prev || {}), token, channelId, user: me.user, team: me.team, lastUsedTs: "0" },
+  });
+}
+
+/** OAuth 대신 이미 발급된 사용자 토큰(xoxp-)을 불러와 연결한다. 예: unipost-2fa-helper 설정의 「고급: 직접 설정」 토큰 */
+async function connectWithToken() {
+  const input = $("#slack-token");
+  const button = $("#btn-slack-token");
+  const token = input.value.trim();
+  showSlackError(null);
+  if (!/^xoxp-[\w-]+$/.test(token)) {
+    showSlackError(new ApprovalError("SLACK_TOKEN_FORMAT"));
+    return;
+  }
+  button.disabled = true;
+  try {
+    await saveConnection(token);
+    input.value = "";
+  } catch (err) {
+    showSlackError(err);
+  } finally {
+    button.disabled = false;
+    refreshStatus();
+  }
+}
+
+async function disconnectSlack() {
+  if (!confirm("슬랙 연결을 해제할까요? 이 PC에 저장된 슬랙 토큰을 폐기합니다.")) return;
+  await chrome.runtime.sendMessage({ type: "APPROVAL_DISCONNECT" }).catch(() => null);
+  showSlackError(null);
+  refreshStatus();
+}
+
+// ---- 인증번호 확인 --------------------------------------------------------
+
 function describeReceivedAt(iso) {
-  if (!iso) return "수신 시각을 알 수 없어요. 방금 받은 메일인지 확인하세요";
+  if (!iso) return "수신 시각을 알 수 없어요";
   const received = new Date(iso);
-  const minutes = Math.max(0, Math.floor((Date.now() - received.getTime()) / 60000));
-  const time = received.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-  return `${received.toLocaleDateString("ko-KR")} ${time} 수신 (${minutes ? `${minutes}분 전` : "방금"})`;
+  const seconds = Math.max(0, Math.floor((Date.now() - received.getTime()) / 1000));
+  const time = received.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return `${time} 수신 (${seconds < 60 ? "방금" : `${Math.floor(seconds / 60)}분 전`})`;
 }
 
 function showFillResult(text, isError) {
@@ -26,32 +125,69 @@ function showFillResult(text, isError) {
   el.classList.toggle("err", !!isError);
 }
 
+function setInfo(text, isError = false) {
+  const info = $("#approval-otp-info");
+  info.textContent = text;
+  info.classList.toggle("hidden", !text);
+  info.classList.toggle("err", isError);
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 아직 쓰지 않은 인증번호를 찾는다. 없으면 메일이 올 때까지 최대 3분 기다린다. 다시 누르면 취소. */
 async function checkOtp() {
   const button = $("#btn-approval-otp");
-  const code = $("#approval-otp-code");
-  const info = $("#approval-otp-info");
-  const actions = $("#approval-otp-actions");
-  button.disabled = true;
-  currentCode = "";
-  code.classList.add("hidden");
-  actions.classList.add("hidden");
+  if (waiting) {
+    waiting.cancelled = true;
+    return;
+  }
+  const job = (waiting = { cancelled: false });
+  current = null;
+  button.textContent = "취소";
+  $("#approval-otp-code").classList.add("hidden");
+  $("#approval-otp-actions").classList.add("hidden");
   showFillResult("", false);
-  info.classList.remove("hidden", "err");
-  info.textContent = "메일함 확인 중…";
 
-  const result = await chrome.runtime.sendMessage({ type: "APPROVAL_LATEST_OTP" }).catch(() => null);
-  button.disabled = false;
-  if (result && result.ok) {
-    currentCode = result.code;
-    code.textContent = result.code;
-    code.classList.remove("hidden");
-    actions.classList.remove("hidden");
-    info.textContent = describeReceivedAt(result.receivedAt);
-  } else {
-    info.textContent = (result && result.message) || "메일함을 확인하지 못했어요";
-    info.classList.add("err");
+  const startedAt = Date.now();
+  const oldest = Math.floor(startedAt / 1000) - APPROVAL_CONFIG.lookbackSec;
+  try {
+    for (;;) {
+      const left = Math.ceil((APPROVAL_CONFIG.waitMs - (Date.now() - startedAt)) / 1000);
+      if (left <= 0) throw new ApprovalError("OTP_TIMEOUT");
+      setInfo(`슬랙 DM 확인 중… 메일이 오면 바로 표시합니다 (${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")})`);
+      const r = await chrome.runtime.sendMessage({ type: "APPROVAL_FETCH_OTP", oldest }).catch(() => null);
+      if (job.cancelled) {
+        setInfo("");
+        return;
+      }
+      if (!r || !r.ok) {
+        setInfo((r && r.message) || "인증번호를 가져오지 못했어요", true);
+        return;
+      }
+      if (!r.pending) {
+        current = { code: r.code, ts: r.ts };
+        $("#approval-otp-code").textContent = r.code;
+        $("#approval-otp-code").classList.remove("hidden");
+        $("#approval-otp-actions").classList.remove("hidden");
+        setInfo(describeReceivedAt(r.receivedAt));
+        return;
+      }
+      await sleep(APPROVAL_CONFIG.pollIntervalMs);
+      if (job.cancelled) {
+        setInfo("");
+        return;
+      }
+    }
+  } catch (err) {
+    setInfo(messageForError(err), true);
+  } finally {
+    waiting = null;
+    button.textContent = "인증번호 확인";
   }
 }
+
+const markUsed = () =>
+  current && chrome.runtime.sendMessage({ type: "APPROVAL_MARK_USED", ts: current.ts }).catch(() => null);
 
 function copyWithSelection(text) {
   const area = document.createElement("textarea");
@@ -66,33 +202,48 @@ function copyWithSelection(text) {
 let copyLabelTimer;
 
 async function copyOtp() {
+  if (!current) return;
   let copied = true;
   try {
-    await navigator.clipboard.writeText(currentCode);
+    await navigator.clipboard.writeText(current.code);
   } catch {
-    copied = copyWithSelection(currentCode);
+    copied = copyWithSelection(current.code);
   }
-  const button = $("#btn-approval-otp-copy");
-  const label = button.querySelector("span");
+  if (copied) markUsed();
+  const label = $("#btn-approval-otp-copy").querySelector("span");
   label.textContent = copied ? "복사됨" : "복사 실패";
   clearTimeout(copyLabelTimer);
   copyLabelTimer = setTimeout(() => (label.textContent = "복사"), 1500);
 }
 
 async function fillOtp() {
+  if (!current) return;
   const button = $("#btn-approval-otp-fill");
   button.disabled = true;
-  const result = await chrome.runtime.sendMessage({ type: "APPROVAL_FILL_OTP", code: currentCode }).catch(() => null);
+  const result = await chrome.runtime
+    .sendMessage({ type: "APPROVAL_FILL_OTP", code: current.code })
+    .catch(() => null);
   button.disabled = false;
-  if (result && result.ok) showFillResult("입력하고 확인 버튼을 눌렀어요", false);
-  else showFillResult((result && result.message) || "입력하지 못했어요", true);
+  if (result && result.ok) {
+    markUsed();
+    showFillResult("입력하고 확인 버튼을 눌렀어요", false);
+  } else {
+    showFillResult((result && result.message) || "입력하지 못했어요", true);
+  }
 }
 
 export function initApprovalUI() {
   $("#btn-approval-otp").addEventListener("click", checkOtp);
   $("#btn-approval-otp-copy").addEventListener("click", copyOtp);
   $("#btn-approval-otp-fill").addEventListener("click", fillOtp);
-  $("#btn-approval-check").addEventListener("click", refreshStatus);
+  $("#btn-slack-connect").addEventListener("click", connectSlack);
+  $("#btn-slack-disconnect").addEventListener("click", disconnectSlack);
+  $("#btn-slack-token").addEventListener("click", connectWithToken);
+  $("#slack-token").addEventListener("keydown", (e) => e.key === "Enter" && connectWithToken());
+  $("#otp-autofill").addEventListener("change", async (e) => {
+    await chrome.runtime.sendMessage({ type: "APPROVAL_SET_AUTOFILL", on: e.target.checked }).catch(() => null);
+    refreshStatus();
+  });
 }
 
 export function onApprovalShown() {

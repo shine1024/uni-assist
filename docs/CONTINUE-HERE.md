@@ -7,17 +7,30 @@
 ---
 
 ## 📌 한 줄 요약
-크롬 사이드 패널 확장 **"Uni-Assist 도우미"**. 기능 2개 — ① **텍스트 추출**(요소 다중 선택 → 정규식 변환 → 조합 → 복사, 허용 사이트 전용 단축키 복사) ② **자동 로그인/로그아웃**(사이트별 ID/PW 등록, `F2` 로 로그인·로그아웃, AES-256-GCM 암호화, PC 간 동기화) ③ **2차 인증 OTP**(메일함에서 인증번호 가져오기, 복사, 현재 탭 입력, Native Messaging) + 패널 토글 `F4`. **v0.5.0.**
+크롬 사이드 패널 확장 **"Uni-Assist 도우미"**. 기능 2개 — ① **텍스트 추출**(요소 다중 선택 → 정규식 변환 → 조합 → 복사, 허용 사이트 전용 단축키 복사) ② **자동 로그인/로그아웃**(사이트별 ID/PW 등록, `F2` 로 로그인·로그아웃, AES-256-GCM 암호화, PC 간 동기화) ③ **2차 인증 OTP**(슬랙 DM 에서 인증번호 가져오기, 복사, 현재 탭 입력, 포털 자동 입력) + 패널 토글 `F4`. **v0.6.0.**
 
-## ✅ 현재 상태 (last updated: 2026-11-10)
+## ✅ 현재 상태 (last updated: 2026-11-11)
 
-### 2차 인증 OTP (v0.5.0 신규)
-- 패널 **🔑 2차 인증 OTP**: 최근 인증 메일의 번호 표시 → 복사 또는 현재 탭의 `input.fid-authPass` 입력 + `.bid-confirm` 클릭
-- 지시서의 결재대기함 열기·결재 비밀번호 저장은 사용자 요청으로 제거했다 (로그인은 기존 F2 사용). 호스트의 `snapshot`·`waitOtp`·`getCredentials` 도 함께 제거
-- `<all_urls>` 는 유지하되 네이티브 호출과 입력 요청은 사이드 패널에서만 허용. 입력 대상은 사용자가 버튼을 누른 시점의 활성 탭
-- 매니페스트 `key` 는 넣지 않았다. 넣으면 확장 ID 가 바뀌어 기존 저장 데이터를 잃는다. 호스트는 PC별 설치 때 ID 를 받는다
-- 실제 메일 서버(한비로) 조회 확인 완료. `pop3.user` 는 전체 메일 주소여야 하고, 제목 패턴의 대괄호는 이스케이프해야 한다
-- **미확인: 실제 인증번호 화면에서의 입력, Windows 설치 스크립트 실행**
+### 2026-11-11 변경 (실제 크롬에서 동작 확인 완료)
+- **디자인 개편**: xAI 디자인(getdesign.md) 기반 그래파이트 테마. 색은 `sidepanel.css` 맨 위 역할 변수만 쓰고,
+  강조색은 `--accent: #88A6FF` 하나. 이모지 대신 선 아이콘(`src/sidepanel/icons.js`, `icon("이름")`).
+  페이지에 뜨는 요소(`src/content/*.css`)도 같은 톤. 확장 아이콘은 `python tools/make-icons.py` 로 생성
+- **확장 ID 고정**: manifest `key` → ID `gknfpjcapdfgainlgjglmooolalpifml` (2fa-helper 의 key 를 이어받음, 어느 PC·폴더든 동일 → 동기화 동작).
+  처음엔 새 key(`fjmhmlhmfiomcjplmoehjmjbfeehhmmj`)로 고정했으나, 슬랙 앱에 그 Redirect URL 을 등록할 수 없어 2fa-helper ID 로 바꿨다.
+  개인키는 저장소 밖 `~/.uni-assist/extension-key.pem`. 설치 스크립트는 Enter 로 고정 ID 사용
+- **백업**: 설정 → 백업 내보내기/가져오기(`src/lib/backup.js`). ID 가 바뀔 때 데이터 이전용
+- **F4**: 패널에 포커스가 있을 때도 닫힘, 설치·다시 불러오기 직후 열린 탭에서도 바로 동작
+- 자동 잠금 1·4·8시간(기본 1시간), OTP 제목 패턴 샘플(`config.example.json`), Windows 호스트 테스트 경로 버그 수정
+- 전체 테스트 스위트 통과 (`node tools/test-all.mjs`)
+
+### 2차 인증 OTP (v0.6.0 — 슬랙 DM 방식으로 교체)
+- 본인 슬랙 DM 에 올라온 인증 메일 파일(제목 「로그인 2차 인증 번호」)에서 8자리 번호. `src/lib/slack-otp.js`
+- 패널: 인증번호 확인(없으면 3분 대기) → 복사 / 입력 후 확인(`input.fid-authPass` + `.bid-confirm`). 「슬랙 연결」 카드에서 OAuth 연결·해제
+- 「포털 인증 화면이 뜨면 자동으로 입력」 체크 시 `src/content/otp-auto.js` 를 포털에 동적 등록
+- Client ID/Secret 은 git 제외 `slack-config.json`(예시 `slack-config.example.json`). 슬랙 앱 Redirect URL 은
+  2fa-helper 것(`https://gknfpjcapdfgainlgjglmooolalpifml.chromiumapp.org/`)을 그대로 쓴다 — 같은 ID
+- POP3 네이티브 호스트(`host/`, `install/`)는 제거. git 기록(v0.5.0)에 남아 있음
+- **미확인: 실제 슬랙 연결·DM 조회, 포털 자동 입력, 입력 후 확인**
 
 ### 텍스트 추출 (v0.2.1에서 유지)
 - 요소 클릭 선택 / 다중 규칙 / 다단계 정규식 변환 / 연결·템플릿 조합 / 복사
@@ -50,8 +63,9 @@
 ## 🎯 다음 할 일 (우선순위 순)
 
 ### 0. 2차 인증 OTP 실환경 확인 (최우선)
-- [ ] 실제 인증번호 화면에서 **입력 후 확인** 동작 확인
-- [ ] 사무실 Windows 에서 `install/` 실행, `host/config.json` 작성
+- [ ] 슬랙 앱 Redirect URL 등록 후 **슬랙으로 연결** → 연결됨 표시
+- [ ] 로그인 2차 인증 화면에서 **인증번호 확인 → 입력 후 확인**
+- [ ] 자동 입력 체크 후 포털 인증 화면에서 자동 입력·확인
 
 ### 1. 수동 검증 (크롬에 로드)
 `chrome://extensions` → 개발자 모드 → 압축해제 로드 → **확장 새로고침**(매니페스트 변경됨).

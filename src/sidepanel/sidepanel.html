@@ -144,7 +144,7 @@
 
         <section class="card">
           <div class="card-head">
-            <h2><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>메일 인증번호</h2>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>인증번호</h2>
             <button id="btn-approval-otp" class="btn btn-primary btn-sm">인증번호 확인</button>
           </div>
           <p class="otp-code hidden" id="approval-otp-code"></p>
@@ -158,13 +158,37 @@
 
         <section class="card">
           <div class="card-head">
-            <h2>설치 상태</h2>
-            <button id="btn-approval-check" class="btn btn-ghost btn-sm">다시 확인</button>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-slack"/></svg>슬랙 연결</h2>
+            <span class="kbd" id="slack-status">…</span>
           </div>
+          <p class="muted hint-text hidden" id="slack-config-hint">
+            슬랙 앱 정보가 없어요. 확장 폴더의 <code>slack-config.example.json</code> 을 <code>slack-config.json</code>
+            으로 복사해 Client ID/Secret 을 넣고 확장을 새로고침하세요.
+          </p>
           <ul class="kv">
-            <li><span>네이티브 호스트</span><span class="kbd" id="approval-host">…</span></li>
-            <li><span>확장 ID <span class="muted">(설치 시 입력)</span></span><code id="approval-ext-id"></code></li>
+            <li><span>계정</span><span id="slack-user">—</span></li>
+            <li class="kv-stack"><span>Redirect URL <span class="muted">(슬랙 앱에 등록)</span></span><code id="slack-redirect"></code></li>
           </ul>
+          <label class="chk chk-block">
+            <input type="checkbox" id="otp-autofill" />
+            <span>포털 인증 화면이 뜨면 자동으로 입력<br /><span class="muted">패널을 열지 않아도 번호를 기다렸다 넣고 확인을 누릅니다</span></span>
+          </label>
+          <details class="token-box" id="slack-token-box">
+            <summary>토큰으로 연결 <span class="muted">— 2fa-helper 연결 불러오기</span></summary>
+            <p class="muted hint-text">
+              2fa-helper 설정 페이지의 <b>고급: 직접 설정 → 토큰</b> 값(<code>xoxp-</code>…)을 붙여 넣으면
+              슬랙 앱 Redirect URL 등록 없이 바로 연결됩니다. 본인 DM 은 자동으로 찾습니다.
+            </p>
+            <div class="token-row">
+              <input id="slack-token" type="password" autocomplete="off" spellcheck="false" placeholder="xoxp-…" />
+              <button id="btn-slack-token" class="btn btn-ghost btn-sm">연결</button>
+            </div>
+          </details>
+          <p class="err hidden" id="slack-error"></p>
+          <div class="result-actions">
+            <button id="btn-slack-disconnect" class="btn btn-ghost btn-sm hidden">연결 해제</button>
+            <button id="btn-slack-connect" class="btn btn-primary btn-sm">슬랙으로 연결</button>
+          </div>
         </section>
       </div>
 

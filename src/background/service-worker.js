@@ -19,7 +19,17 @@ import {
 import { getSettings, loadSites } from "../lib/login-store.js";
 import * as vault from "../lib/vault.js";
 import { isExtensionPage } from "../lib/approval-flow.js";
-import { approvalStatus, fillOtpInActiveTab, latestApprovalOtp } from "./approval.js";
+import {
+  K_SLACK,
+  approvalStatus,
+  disconnectSlack,
+  fetchApprovalOtp,
+  fillOtpInActiveTab,
+  isAutoFillSender,
+  markApprovalOtpUsed,
+  setAutoFill,
+  syncAutoFillRegistration,
+} from "./approval.js";
 
 const CMD = "copy-combined";
 const CMD_LOGIN = "auto-login";
@@ -31,9 +41,18 @@ chrome.runtime.onInstalled.addListener(() => {
   // 등록한 콘텐츠 스크립트는 이후 새로 열리는 페이지에만 들어간다.
   // 설치·업데이트·다시 불러오기 직후에도 이미 열린 탭에서 F2/F4 가 바로 되도록 직접 심는다.
   syncHotkeyRegistration().then(injectHotkeyIntoOpenTabs);
+  syncAutoFillRegistration();
 });
 
 chrome.runtime.onStartup.addListener(() => syncHotkeyRegistration());
+
+// 슬랙 토큰이 storage.local 에 있으므로 콘텐츠 스크립트는 local 을 읽지 못하게 한다(콘텐츠 스크립트는 local 을 쓰지 않는다).
+chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }).catch(() => {});
+
+// 슬랙 연결·자동 입력 설정이 바뀌면 포털 자동 입력 등록을 맞춘다
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[K_SLACK]) syncAutoFillRegistration();
+});
 
 // ---- 단축키 처리 ---------------------------------------------------------
 chrome.commands.onCommand.addListener((command) => {
@@ -380,13 +399,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return;
   const approvalAction = {
     APPROVAL_STATUS: approvalStatus,
-    APPROVAL_LATEST_OTP: latestApprovalOtp,
+    APPROVAL_FETCH_OTP: () => fetchApprovalOtp(msg.oldest),
+    APPROVAL_MARK_USED: () => markApprovalOtpUsed(msg.ts),
     APPROVAL_FILL_OTP: () => fillOtpInActiveTab(msg.code),
+    APPROVAL_DISCONNECT: disconnectSlack,
+    APPROVAL_SET_AUTOFILL: () => setAutoFill(msg.on),
   }[msg.type];
   if (approvalAction) {
     // 인증번호를 다루므로 웹페이지에 주입된 스크립트에서는 호출할 수 없게 한다.
     if (!isExtensionPage(sender, chrome.runtime.id)) return;
     approvalAction().then(sendResponse);
+    return true;
+  }
+  const autoAction = {
+    OTP_AUTO_FETCH: () => fetchApprovalOtp(msg.oldest),
+    OTP_AUTO_USED: () => markApprovalOtpUsed(msg.ts),
+  }[msg.type];
+  if (autoAction) {
+    // 포털 자동 입력 스크립트 — 자동 입력이 켜져 있고 포털 페이지일 때만 응답한다
+    isAutoFillSender(sender).then((allowed) =>
+      allowed ? autoAction().then(sendResponse) : sendResponse({ ok: false, code: "BAD_REQUEST" })
+    );
     return true;
   }
   if (msg.type === "LOGIN_RUN") {

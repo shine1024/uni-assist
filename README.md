@@ -7,7 +7,7 @@
 |---|---|
 | 🔤 텍스트 추출 | 여러 요소에서 텍스트 추출 → 정규식 가공 → 조합 → 복사 (+ 허용 사이트 전용 단축키 복사) |
 | 🔐 자동 로그인 | 사이트별 ID/PW 등록 → 단축키(기본 `F2`) 한 번으로 **로그인, 로그인 상태면 로그아웃**. AES-256-GCM 암호화 + PC 간 동기화 |
-| 🔑 2차 인증 OTP | 메일함에서 **2차 인증번호를 가져와** 복사하거나 현재 탭에 입력 (Native Messaging) |
+| 🔑 2차 인증 OTP | 슬랙 DM 으로 온 **2차 인증번호를 가져와** 복사하거나 현재 탭에 입력, 켜면 포털 화면에 자동 입력 |
 | ⚙ 설정 | 마스터 비밀번호·자동 잠금, 동기화 상태, 단축키 |
 
 패널 열기/닫기는 **`F4`** 입니다 (설정에서 변경 가능).
@@ -33,7 +33,7 @@
 3. **압축해제된 확장 프로그램을 로드합니다** 클릭 → 이 폴더(`uni-assist`) 선택
 4. 툴바의 ⛏ 아이콘 클릭 → 사이드 패널이 열림 (고정하려면 아이콘 우클릭 → 핀)
 
-> Chrome 114 이상 필요 (사이드 패널 API). 아이콘을 다시 만들려면 `python tools/make_icons.py`.
+> Chrome 114 이상 필요 (사이드 패널 API). 아이콘을 다시 만들려면 `python tools/make-icons.py`.
 
 ## 사용법
 
@@ -166,7 +166,7 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
 | 비밀번호 취급 | 평문 저장·콘솔 출력 없음, 복사 기능 없음, 저장 직후 메모리에서 폐기, 비밀번호 입력창의 기존 값은 추출 대상에서 제외 |
 | 동기화 경합 방지 | 사이트는 동기화됐는데 금고 정보가 아직 안 온 상태에서는 **"최초 설정"을 차단** (새 금고로 덮어쓰면 기존 암호문을 영구히 잃음) |
 | 원인 진단 | 암호문마다 **키 지문**(키 SHA-256 앞 6바이트)을 기록해, 복호화 실패 시 "손상"과 "다른 마스터 비밀번호로 암호화됨"을 구분 |
-| 추가 인증 | 자동 로그인 메뉴는 CAPTCHA·MFA·Passkey를 **다루지 않고** 1차 자격증명까지만 자동화. 메일 인증번호 입력은 **🔑 2차 인증 OTP 메뉴에서 버튼을 눌렀을 때만** 수행 |
+| 추가 인증 | 자동 로그인 메뉴는 CAPTCHA·MFA·Passkey를 **다루지 않고** 1차 자격증명까지만 자동화. 인증번호 입력은 **2차 인증 메뉴의 버튼**, 또는 사용자가 켠 **포털 자동 입력**으로만 수행 |
 
 > ⚠ 마스터 비밀번호는 어디에도 저장되지 않습니다. **분실하면 저장된 비밀번호를 복구할 수 없습니다.**
 > 변경 시에는 저장된 모든 비밀번호를 새 키로 다시 암호화합니다.
@@ -179,62 +179,50 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
 - ⚠ **새 PC를 붙일 때는 동기화가 끝난 뒤 기존 마스터 비밀번호를 입력하세요.** 아직 도착하지 않은 상태에서
   새로 설정하면 기존 비밀번호를 열 수 없게 되므로, 그런 상태를 감지하면 설정을 막고 안내합니다.
 - 동기화는 **확장 프로그램 ID가 같을 때만** 공유됩니다. 압축해제 로드는 원래 폴더 경로에 따라 ID가 달라지므로,
-  `manifest.json` 의 `key` 로 ID를 **`fjmhmlhmfiomcjplmoehjmjbfeehhmmj`** 로 고정해 두었습니다. 어느 PC, 어느 폴더에 받아도 같은 ID입니다.
+  `manifest.json` 의 `key` 로 ID를 **`gknfpjcapdfgainlgjglmooolalpifml`** 로 고정해 두었습니다. 어느 PC, 어느 폴더에 받아도 같은 ID입니다.
+  (2차 인증 기능을 흡수한 `unipost-2fa-helper` 의 ID 를 이어받아, 슬랙 앱에 등록된 Redirect URL 을 그대로 씁니다. 두 확장은 함께 설치할 수 없습니다)
   - 고정 전 버전을 쓰던 PC는 ID가 바뀌어 기존 데이터가 보이지 않습니다. 이전 버전에서 **설정 → 백업 → 내보내기** 한 파일을
-    새 버전에서 **가져오기** 하고, OTP 호스트 설치 스크립트를 한 번 다시 실행하세요.
+    새 버전에서 **가져오기** 하고, 2차 인증 메뉴에서 **슬랙으로 연결**을 다시 누르세요.
 - 용량 제한(Chrome 공식): 전체 **100KB**, 항목당 **8KB**, 최대 512항목. 사이트 1개 = sync 항목 1개로 나눠 저장합니다.
   설정 → 동기화 카드에서 현재 사용량을 볼 수 있습니다.
 
 ## 2차 인증 OTP 가져오기
 
-사이드 패널 **🔑 2차 인증 OTP → 인증번호 확인** 을 누르면 가장 최근 인증 메일의 번호와 수신 시각을 보여 줍니다.
+인증 메일은 메일→슬랙 연동으로 **본인 슬랙 DM** 에 메일 파일로 올라옵니다. 확장은 그 DM 을 읽어 제목에
+「로그인 2차 인증 번호」가 들어간 메일에서 8자리 번호를 꺼냅니다(`unipost-2fa-helper` 와 같은 방식).
+메일 서버 정보나 별도 설치 프로그램은 필요 없습니다.
 
-- **📋 복사**: 인증번호를 클립보드에 복사합니다.
-- **입력 후 확인**: 현재 탭의 `input.fid-authPass` 에 입력하고 `.bid-confirm` 을 누릅니다.
+사이드 패널 **2차 인증 → 인증번호 확인**:
+- 아직 쓰지 않은 최근 3분 안의 번호를 보여 줍니다. 메일이 아직 안 왔으면 **최대 3분 동안 3초마다** 다시 확인합니다(다시 누르면 취소).
+- **복사** / **입력 후 확인**(현재 탭의 `input.fid-authPass` 에 넣고 `.bid-confirm` 클릭). 쓴 번호는 다음 로그인에 다시 쓰지 않습니다.
+- **포털 인증 화면이 뜨면 자동으로 입력**을 켜면, 패널을 열지 않아도 포털(`unipost.co.kr/portal`) 인증 화면에서 번호를 기다렸다 넣고 확인을 누릅니다.
+  끄면 포털에 스크립트를 심지 않습니다.
 
-이전 메일의 번호일 수 있으니 수신 시각을 확인하세요. 셀렉터는 `src/lib/approval-config.js` 에 있고, 고친 뒤에는 `chrome://extensions` 에서 확장을 새로고침합니다.
+셀렉터·제목 문구·대기 시간은 `src/lib/approval-config.js` 에 있습니다(고친 뒤 확장 새로고침).
 
-크롬 확장은 POP3 에 직접 접속할 수 없어, 로컬 Node 프로그램(`host/`)을 Native Messaging 으로 호출합니다.
-호스트를 설치하지 않아도 다른 기능은 그대로 동작합니다.
+### 준비
 
-### 설치 (macOS / Windows 각 PC에서 1회)
+1. **슬랙 앱**: *Unipost 2FA Reader* 의 Redirect URL `https://gknfpjcapdfgainlgjglmooolalpifml.chromiumapp.org/` 를 그대로 씁니다
+   (2fa-helper 와 같은 확장 ID). User Token Scopes: `im:history`, `im:read`, `files:read`.
+   **2fa-helper 가 설치돼 있으면 먼저 삭제하세요** — 같은 ID 라 함께 설치할 수 없습니다.
+2. **각 PC**: `slack-config.example.json` 을 `slack-config.json` 으로 복사해 Client ID/Secret 을 넣고 확장을 새로고침합니다.
+   이 파일은 Secret 이 들어 있어 **git 에서 제외**했습니다. 팀 외부로 공유하지 마세요.
+3. 패널 **2차 인증 → 슬랙으로 연결** → 슬랙 창에서 **허용**. 본인 DM 은 자동으로 찾습니다.
 
-Node.js 20.11 이상이 필요합니다. 설치 중 **확장 ID** 를 물으면 Enter 로 고정 ID를 쓰면 됩니다(사이드 패널 **2차 인증** 메뉴에도 표시됩니다).
-
-```bash
-bash install/install-mac.sh                                          # macOS
-powershell -ExecutionPolicy Bypass -File install\install-win.ps1     # Windows
-```
-
-스크립트가 의존성 설치, 호스트 등록, 메일 비밀번호의 OS 키체인 저장(입력 숨김)을 처리합니다.
-제거는 macOS `--uninstall`, Windows `-Uninstall` 입니다. Node 를 업그레이드했거나 폴더를 옮겼다면 다시 실행하세요.
-
-### 설정 (`host/config.json`)
-
-| 값 | 내용 |
-|---|---|
-| `pop3.host` / `pop3.user` | POP3 호스트와 메일 계정. 한비로는 **전체 메일 주소**를 씁니다 |
-| `otp.from` | 인증 메일 발신 주소 |
-| `otp.subjectPattern` | 제목 **정규식**. `[`, `]` 는 `\\[`, `\\]` 로 이스케이프합니다 |
-| `otp.codePattern` | 본문에서 번호를 찾는 정규식 |
-
-`host/config.json` 은 사내 정보가 저장소에 올라가지 않도록 git 에서 제외했습니다. PC마다 따로 채웁니다.
-`config.example.json` 에 사내 공통값(호스트·발신 주소·제목·번호 패턴)이 들어 있으니 복사한 뒤 `pop3.user` 만 본인 메일 주소로 바꾸면 됩니다.
-제목 패턴 예: `"\\[유니포스트\\] 로그인 2차 인증 번호 발급 안내"` — 대괄호를 이스케이프하지 않으면 어떤 메일과도 일치하지 않습니다.
-비밀번호는 키체인에만 저장하며 이 파일에 넣지 않습니다.
+슬랙 사용자 토큰은 **이 PC 의 `chrome.storage.local` 에만** 저장합니다(동기화·백업 제외, 웹페이지 스크립트는 읽을 수 없음).
+**연결 해제**를 누르면 슬랙에서도 토큰을 폐기합니다. `im:history` 는 본인 DM 전체를 읽을 수 있는 권한이니 공용 PC 에서는 연결하지 마세요.
 
 ### 문제 해결
 
 | 안내 | 조치 |
 |---|---|
-| 호스트에 연결하지 못했어요 | 설치 스크립트 실행, 확장 ID 일치 확인 |
-| 키체인에 메일 비밀번호가 없어요 | 설치 스크립트로 등록 |
-| 메일 로그인에 실패했어요 | `pop3.user` 가 전체 주소인지 확인, 비밀번호 재등록 (`node host/setup-credentials.js`) |
-| 메일 서버에 접속하지 못했어요 | 호스트 주소, 995 포트, 사내망·VPN, 인증서 확인 |
-| 최근 메일에서 인증 메일을 찾지 못했어요 | 발신 주소, 제목 패턴의 대괄호 이스케이프 확인 |
+| 슬랙 앱 정보가 없어요 | `slack-config.json` 작성 후 확장 새로고침 |
+| `redirect_uri did not match` / 앱 정보를 확인하세요 | 슬랙 앱 Redirect URLs 에 위 주소 등록, Client ID/Secret 오타 확인 |
+| 슬랙 앱 권한을 확인하세요 | 슬랙 앱 User Token Scopes 확인 후 다시 연결 |
+| 슬랙 연결이 만료됐어요 | 다시 연결 |
+| 3분 안에 인증 메일이 오지 않았어요 | 슬랙 DM 에 메일이 올라오는지, 제목 문구(`approval-config.js` 의 `titleKeyword`) 확인 |
 | 입력칸·확인 버튼을 찾지 못했어요 | 인증번호 화면 탭이 활성 상태인지, `approval-config.js` 셀렉터가 맞는지 확인 |
 
-메일 서버의 "가져간 메일 삭제" 설정은 꺼 두어야 합니다. 이 도구는 메일을 지우지 않지만 서버 설정까지 막을 수는 없습니다.
 사용 전 사내 보안 정책상 2차 인증 자동화가 허용되는지 확인하세요.
 
 ## 폴더 구조
@@ -242,16 +230,21 @@ powershell -ExecutionPolicy Bypass -File install\install-win.ps1     # Windows
 ```
 uni-assist/
 ├─ manifest.json              # MV3 매니페스트
-├─ icons/                     # 아이콘 (tools/make_icons.py 로 생성)
+├─ slack-config.example.json  # 슬랙 앱 Client ID/Secret 예시 (slack-config.json 으로 복사, git 제외)
+├─ icons/                     # 아이콘 (tools/make-icons.py 로 생성)
 ├─ src/
 │  ├─ background/service-worker.js   # 패널 열기 + 단축키(복사 / 자동 로그인) (ES 모듈)
 │  ├─ content/
 │  │  ├─ picker.js + .css            # 요소 선택/추출/토스트 (텍스트 추출 + 로그인 셀렉터 선택 공용)
 │  │  ├─ autofill.js + .css          # 자동 로그인 전용: 값 주입·버튼 클릭·계정 선택 오버레이
-│  │  └─ hotkey.js                   # 페이지 내 단축키(F2/F4) 수신 — 동적 등록
+│  │  ├─ hotkey.js                   # 페이지 내 단축키(F2/F4) 수신 — 동적 등록
+│  │  └─ otp-auto.js                 # 포털 2차 인증 자동 입력 — 설정에서 켰을 때만 동적 등록
 │  ├─ sidepanel/
 │  │  ├─ sidepanel.html/.css/.js     # 메뉴 + 텍스트 추출 컨트롤러
-│  │  └─ login.js                    # 자동 로그인 화면 컨트롤러 (독립 모듈)
+│  │  ├─ login.js                    # 자동 로그인 화면 컨트롤러 (독립 모듈)
+│  │  ├─ approval.js                 # 2차 인증 화면 (슬랙 연결 OAuth + 인증번호 확인)
+│  │  ├─ backup.js                   # 설정 → 백업 내보내기/가져오기
+│  │  └─ icons.js                    # 선 아이콘 SVG 스프라이트
 │  ├─ offscreen/                     # 서비스 워커용 클립보드 복사 문서
 │  └─ lib/                           # 순수/공용 로직
 │     ├─ transform.js                #   변환·조합
@@ -261,26 +254,26 @@ uni-assist/
 │     ├─ hotkey.js                   #   키 조합 정규화/비교/충돌 (F2·F4)
 │     ├─ login-store.js              #   사이트·계정 저장 (chrome.storage.sync, 분할 저장)
 │     ├─ vault.js                    #   마스터 비밀번호·잠금 세션
+│     ├─ slack-otp.js                #   슬랙 DM 조회·인증번호 추출·OAuth
+│     ├─ backup.js                   #   백업 파일 만들기/읽기
 │     └─ tabs.js                     #   활성 탭 조회/콘텐츠 스크립트 주입
 ├─ tools/
-│  ├─ make_icons.py           # 아이콘 생성기 (의존성 없음)
+│  ├─ make-icons.py           # 확장 아이콘 생성기 (Pillow)
 │  ├─ test-transform.mjs      # 텍스트 추출 로직 테스트 (18종)
 │  ├─ test-login.mjs          # 암호화·키 지문 + URL 매칭 (65종)
 │  ├─ test-vault.mjs          # 저장소·마스터 비밀번호·동기화 가드 (가짜 chrome.storage, 62종)
 │  ├─ test-hotkey.mjs         # 단축키 조합·후보 선정·매치 패턴 + 복제 로직 동기화 (60종)
-│  ├─ test-approval-flow.mjs  # 2차 인증 OTP 입력·호스트 포트 (38종)
-│  ├─ test-host-pop3.mjs      # POP3 조회·인증번호 추출 (50종, host 의존성 필요)
-│  ├─ test-host-protocol.mjs  # Native Messaging 프로토콜 (26종, host 의존성 필요)
+│  ├─ test-approval-flow.mjs  # 2차 인증 입력·요청 출처·권한 (35종)
+│  ├─ test-slack-otp.mjs      # 슬랙 DM 조회·번호 추출·OAuth (가짜 fetch, 33종)
+│  ├─ test-backup.mjs         # 백업 내보내기/가져오기 (14종)
 │  └─ test-all.mjs            # 전체 실행
-├─ host/                      # 2차 인증 OTP Native Messaging 호스트 (Node.js)
-├─ install/                   # 호스트 설치 스크립트 (macOS / Windows)
 └─ docs/                      # 개발 이력 / 작업 세션 관리 → docs/CONTINUE-HERE.md 참고
 ```
 
 ## 테스트
 
 ```bash
-node tools/test-all.mjs          # 전체 (319종, host/ 에서 npm ci 후)
+node tools/test-all.mjs          # 전체 (290종)
 node tools/test-transform.mjs    # 텍스트 추출만 (18종)
 node tools/test-login.mjs        # 암호화·키 지문·URL 매칭 (65종)
 node tools/test-vault.mjs        # 저장소·잠금·마스터 변경·동기화 가드 (62종)

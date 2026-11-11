@@ -1,7 +1,8 @@
 // 2차 인증 OTP 테스트 (브라우저 없이 가짜 입출력으로 검증)
 // 실행: node tools/test-approval-flow.mjs
 import { readFileSync } from "node:fs";
-import { createHostClient, isExtensionPage, messageForError } from "../src/lib/approval-flow.js";
+import { isExtensionPage, messageForError } from "../src/lib/approval-flow.js";
+import { APPROVAL_CONFIG } from "../src/lib/approval-config.js";
 import { pageFillOtp } from "../src/background/approval-page-actions.js";
 
 let pass = 0;
@@ -37,57 +38,11 @@ console.log("요청 출처");
   eq(isExtensionPage(undefined, id), false, "발신자 없음 거부");
 }
 
-console.log("호스트 포트");
-{
-  function fakePort() {
-    const listeners = {};
-    return {
-      sent: [],
-      disconnected: false,
-      onMessage: { addListener: (fn) => (listeners.message = fn) },
-      onDisconnect: { addListener: (fn) => (listeners.disconnect = fn) },
-      postMessage(message) {
-        this.sent.push(message);
-      },
-      disconnect() {
-        this.disconnected = true;
-      },
-      emit: (message) => listeners.message(message),
-      drop: () => listeners.disconnect(),
-    };
-  }
-
-  const port = fakePort();
-  const client = createHostClient(port);
-  const first = client.latestOtp();
-  const second = client.ping();
-  eq(port.sent[0], { id: 1, type: "latestOtp" }, "latestOtp 요청 형식");
-  port.emit({ id: 2, ok: true, version: "1" });
-  port.emit({ id: 1, ok: true, code: "87654321", receivedAt: null });
-  eq([(await first).code, (await second).version], ["87654321", "1"], "응답 순서가 달라도 id 로 짝지음");
-
-  const third = client.latestOtp();
-  port.emit({ id: 3, ok: false, error: { code: "CREDENTIAL_MISSING", message: "x" } });
-  eq(await failure(third), "CREDENTIAL_MISSING", "호스트 오류 코드 전달");
-
-  const waiting = client.latestOtp();
-  port.drop();
-  eq(await failure(waiting), "HOST_NOT_FOUND", "포트가 끊기면 실패로 끝남");
-  eq(await failure(client.ping()), "HOST_NOT_FOUND", "끊긴 뒤 요청은 즉시 실패");
-
-  const quiet = fakePort();
-  const closing = createHostClient(quiet);
-  const inFlight = closing.ping();
-  closing.close();
-  eq(quiet.disconnected, true, "close 는 포트를 끊음");
-  eq(await failure(inFlight), "HOST_NOT_FOUND", "대기 중인 요청 정리");
-  eq(typeof closing.getCredentials, "undefined", "결재 비밀번호 요청 경로 없음");
-}
-
 console.log("안내 문구");
 {
-  eq(messageForError({ code: "OTP_NOT_FOUND" }).includes("인증 메일"), true, "인증 메일 없음 안내");
-  eq(messageForError({ code: "POP3_AUTH_FAILED" }).includes("계정"), true, "로그인 실패는 계정도 확인하도록 안내");
+  eq(messageForError({ code: "OTP_TIMEOUT" }).includes("인증 메일"), true, "3분 안에 메일 없음 안내");
+  eq(messageForError({ code: "SLACK_NOT_CONNECTED" }).includes("연결"), true, "슬랙 미연결 안내");
+  eq(messageForError({ code: "SLACK_CONFIG_MISSING" }).includes("slack-config.json"), true, "앱 정보 없음은 파일 이름까지 안내");
   eq(messageForError({ code: "OTP_INPUT_NOT_FOUND" }).includes("입력칸"), true, "입력칸 없음 안내");
 }
 
@@ -208,7 +163,8 @@ console.log("범위·권한");
 {
   const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const manifest = JSON.parse(read("manifest.json"));
-  eq(manifest.permissions.includes("nativeMessaging"), true, "nativeMessaging 권한");
+  eq(manifest.permissions.includes("nativeMessaging"), false, "nativeMessaging 권한 제거 (POP3 호스트 제거)");
+  eq(manifest.permissions.includes("identity"), true, "identity 권한 (슬랙 OAuth)");
   eq(Object.hasOwn(manifest.commands, "approval-login"), false, "결재대기함 단축키 제거");
   const keys = Object.values(manifest.commands).map((c) => c.suggested_key.default);
   eq(new Set(keys).size, keys.length, "단축키 중복 없음");
@@ -216,7 +172,25 @@ console.log("범위·권한");
   const sources = ["src/lib/approval-flow.js", "src/lib/approval-config.js", "src/background/approval.js", "src/background/approval-page-actions.js"];
   const combined = sources.map(read).join("\n");
   eq(/console\.\w+/.test(combined), false, "console 출력 없음");
-  eq(/chrome\.storage/.test(combined), false, "chrome.storage 에 저장하지 않음");
+  eq(/chrome\.storage\.sync/.test(combined + read("src/lib/slack-otp.js")), false, "슬랙 토큰은 동기화 저장소에 두지 않음");
+  eq(/token/.test(read("src/content/otp-auto.js")), false, "자동 입력 스크립트는 토큰을 다루지 않음");
+
+  // otp-auto.js 는 모듈이 아니어서 설정값을 복제한다 — lib 와 같아야 한다
+  const auto = read("src/content/otp-auto.js");
+  const dup = (name) => (auto.match(new RegExp(`const ${name} = ([^;]+);`)) || [])[1];
+  eq(
+    [dup("OTP_INPUT"), dup("OTP_SUBMIT"), dup("SUBMIT_WAIT_MS"), dup("POLL_INTERVAL_MS"), dup("WAIT_MS"), dup("LOOKBACK_SEC")],
+    [
+      JSON.stringify(APPROVAL_CONFIG.selectors.otpInput),
+      JSON.stringify(APPROVAL_CONFIG.selectors.otpSubmit),
+      String(APPROVAL_CONFIG.submitWaitMs),
+      String(APPROVAL_CONFIG.pollIntervalMs),
+      String(APPROVAL_CONFIG.waitMs),
+      String(APPROVAL_CONFIG.lookbackSec),
+    ],
+    "otp-auto.js 복제 값이 approval-config.js 와 일치"
+  );
+  eq(read(".gitignore").includes("slack-config.json"), true, "슬랙 Client Secret 파일은 git 제외");
 
   const panel = read("src/sidepanel/sidepanel.html") + read("src/sidepanel/approval.js") + read("src/background/service-worker.js");
   eq(/APPROVAL_RUN|btn-approval-run|결재대기함/.test(panel), false, "결재대기함 열기 화면·요청 제거");

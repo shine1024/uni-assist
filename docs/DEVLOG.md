@@ -3,6 +3,17 @@
 > 시간순 변경 기록(요약). 한 줄~몇 줄로 간결하게. 상세는 `sessions/`의 세션 로그 참고.
 > 형식: `## YYYY-MM-DD  vX.Y.Z (선택)` → 변경 항목 불릿.
 
+## 2026-11-11  v0.6.0 — 2차 인증 OTP 를 슬랙 DM 방식으로 교체
+- 인증번호를 POP3 메일함 대신 **본인 슬랙 DM**(메일→슬랙 연동이 올리는 메일 파일)에서 가져온다. `unipost-2fa-helper` 방식 이식
+- 패널 「설치 상태」 → 「슬랙 연결」(OAuth `chrome.identity`, 본인 DM 자동 탐색, 연결 해제 시 토큰 폐기)
+- 인증번호 확인은 메일이 아직 없으면 3초 간격 최대 3분 대기, 쓴 번호는 재사용 안 함
+- 설정 체크박스로 **포털 자동 입력**(`src/content/otp-auto.js`, 켰을 때만 동적 등록)
+- 토큰은 `storage.local`(동기화·백업 제외), `setAccessLevel(TRUSTED_CONTEXTS)` 로 콘텐츠 스크립트 접근 차단
+- Client ID/Secret 은 git 제외 `slack-config.json`. 권한 `nativeMessaging` 제거, `identity` 추가
+- `host/`(POP3 네이티브 호스트)·`install/`·호스트 테스트 제거. 테스트 `test-slack-otp.mjs` 추가 → 전체 290종 통과
+- 확장 ID 를 2fa-helper 의 key 로 이어받음(`gknfpjcapdfgainlgjglmooolalpifml`) — 슬랙 앱에 그 Redirect URL 만 등록돼 있어 새 ID 로는 OAuth 가 `redirect_uri did not match` 로 실패했다. 2fa-helper 확장은 삭제(함께 설치 불가), 데이터는 백업 가져오기로 이전
+- 「토큰으로 연결」(사용자 토큰 직접 입력) 추가, 연결 실패 안내에 원인 코드(슬랙 오류 코드 등) 표시
+
 ## 2026-11-11  — 사이드 패널 디자인 개편 · 자동 잠금 시간 변경
 - 사이드 패널 테마: getdesign.md 의 xAI 디자인 기반 그래파이트 테마(차콜 바탕, 흰 잉크, 강조색 `#88A6FF` 하나), 알약형 버튼·탭
 - 이모지 → 선 아이콘(`src/sidepanel/icons.js` SVG 스프라이트), 메뉴는 아이콘+라벨 2단, 섹션 영문 라벨(`01 / EXTRACT` 등), 헤더 버전 칩

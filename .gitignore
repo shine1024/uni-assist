@@ -13,10 +13,5 @@ desktop.ini
 .tmp/
 node_modules/
 
-# 사내 메일 서버·계정 정보 (host/config.example.json 을 복사해 사용)
-host/config.json
-
-# 설치 스크립트가 PC별로 생성하는 파일
-host/run-host.sh
-host/host.bat
-host/com.unipost.approval_otp.json
+# 슬랙 앱 Client ID/Secret (slack-config.example.json 을 복사해 사용)
+slack-config.json
