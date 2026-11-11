@@ -1,5 +1,6 @@
 // 사이드 패널 컨트롤러 — 메뉴 전환 + (텍스트 추출) 상태 관리·요소 선택/추출·변환·조합·프리셋·단축키 설정
 // 자동 로그인 화면은 독립 모듈 `login.js` 가 담당한다.
+import { icon } from "./icons.js";
 import { applyTransforms, combineResults } from "../lib/transform.js";
 import { parsePatterns } from "../lib/match.js";
 import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
@@ -84,7 +85,7 @@ function recompute() {
     if (!el) return;
     const c = computed[i];
     el.classList.toggle("error", !!c.error);
-    el.textContent = c.error ? "⚠ " + c.error : c.result === "" ? "(빈 값)" : c.result;
+    el.textContent = c.error ? c.error : c.result === "" ? "(빈 값)" : c.result;
   });
   resultEl.value = combineResults(computed, state.combine);
   saveStateDebounced();
@@ -100,7 +101,7 @@ function ruleCardHTML(r, num) {
       <input data-field="replace" placeholder="바꿀 내용(비움=삭제)" value="${escAttr(x.replace)}" />
       <label class="xf-regex"><input type="checkbox" data-field="isRegex" ${x.isRegex ? "checked" : ""}/>정규식</label>
       <input class="flags" data-field="flags" title="플래그 (예: gi)" value="${escAttr(x.flags || "g")}" ${x.isRegex ? "" : "disabled"} />
-      <button class="btn btn-icon" data-action="xf-remove" title="이 변환 삭제">✕</button>
+      <button class="btn btn-icon" data-action="xf-remove" title="이 변환 삭제">${icon("x")}</button>
     </div>`
     )
     .join("");
@@ -111,16 +112,16 @@ function ruleCardHTML(r, num) {
       <span class="rule-num">${num}</span>
       <input class="rule-name" data-field="name" placeholder="규칙 이름" value="${escAttr(r.name)}" />
       <div class="rule-tools">
-        <button class="btn btn-icon" data-action="up" title="위로">↑</button>
-        <button class="btn btn-icon" data-action="down" title="아래로">↓</button>
-        <button class="btn btn-icon btn-danger" data-action="delete" title="규칙 삭제">🗑</button>
+        <button class="btn btn-icon" data-action="up" title="위로">${icon("up")}</button>
+        <button class="btn btn-icon" data-action="down" title="아래로">${icon("down")}</button>
+        <button class="btn btn-icon btn-danger" data-action="delete" title="규칙 삭제">${icon("trash")}</button>
       </div>
     </div>
 
     <div class="rule-selector">
       <code class="${r.missing ? "missing" : ""}" data-selector>${escAttr(r.selector || "(선택 안 됨)")}</code>
       <button class="btn btn-sm" data-action="reselect" title="요소 다시 선택">다시 선택</button>
-      <button class="btn btn-sm btn-icon" data-action="refresh" title="이 페이지에서 재추출">↻</button>
+      <button class="btn btn-sm btn-icon" data-action="refresh" title="이 페이지에서 재추출">${icon("refresh")}</button>
     </div>
 
     <div class="rule-source">
@@ -234,7 +235,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     }
     pickingRuleId = null;
     renderRules();
-    toast("요소를 가져왔어요 ✓");
+    toast("요소를 가져왔어요");
   } else if (msg.type === "PICK_CANCELLED") {
     pickingRuleId = null;
     renderRules();
@@ -385,7 +386,7 @@ $("#btn-copy").addEventListener("click", async () => {
     document.execCommand("copy");
     resultEl.setAttribute("readonly", "");
   }
-  toast("복사됨 ✓");
+  toast("복사됨");
 });
 
 // ---- 프리셋 --------------------------------------------------------------
@@ -432,7 +433,7 @@ $("#btn-save-preset").addEventListener("click", async () => {
   await setPresets(list);
   nameInput.value = "";
   renderPresets();
-  toast("프리셋 저장됨 ✓");
+  toast("프리셋 저장됨");
 });
 
 $("#preset-list").addEventListener("click", async (e) => {
@@ -541,6 +542,7 @@ $("#nav").addEventListener("click", (e) => {
 
 // ---- 초기화 --------------------------------------------------------------
 (async function init() {
+  $("#app-version").textContent = `v${chrome.runtime.getManifest().version}`;
   await loadState();
   renderCombineControls();
   renderRules();

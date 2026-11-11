@@ -73,9 +73,10 @@ async function copyOtp() {
     copied = copyWithSelection(currentCode);
   }
   const button = $("#btn-approval-otp-copy");
-  button.textContent = copied ? "복사됨 ✓" : "복사 실패";
+  const label = button.querySelector("span");
+  label.textContent = copied ? "복사됨" : "복사 실패";
   clearTimeout(copyLabelTimer);
-  copyLabelTimer = setTimeout(() => (button.textContent = "📋 복사"), 1500);
+  copyLabelTimer = setTimeout(() => (label.textContent = "복사"), 1500);
 }
 
 async function fillOtp() {

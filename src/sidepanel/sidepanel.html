@@ -9,26 +9,27 @@
   <body>
     <header class="app-header">
       <div class="title">
-        <span class="logo">🧰</span>
-        <span>Uni-Assist 도우미</span>
+        <svg class="ic logo" aria-hidden="true"><use href="#i-logo"/></svg>
+        <span class="brand">UNI<span class="brand-sep">/</span>ASSIST</span>
       </div>
+      <span class="sys-chip" title="확장 버전"><span class="dot"></span><span id="app-version">v—</span></span>
     </header>
 
     <!-- 기능 메뉴 -->
     <nav class="nav" id="nav">
-      <button class="nav-btn active" data-view="extract">🔤 텍스트 추출</button>
-      <button class="nav-btn" data-view="login">🔐 자동 로그인</button>
-      <button class="nav-btn" data-view="approval">🔑 2차 인증 OTP</button>
-      <button class="nav-btn" data-view="settings">⚙ 설정</button>
+      <button class="nav-btn active" data-view="extract"><svg class="ic" aria-hidden="true"><use href="#i-extract"/></svg><span>텍스트 추출</span></button>
+      <button class="nav-btn" data-view="login"><svg class="ic" aria-hidden="true"><use href="#i-login"/></svg><span>자동 로그인</span></button>
+      <button class="nav-btn" data-view="approval"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span>2차 인증</span></button>
+      <button class="nav-btn" data-view="settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span>설정</span></button>
     </nav>
 
     <main>
       <!-- ================= 텍스트 추출 (기존) ================= -->
       <div class="view" id="view-extract">
         <section class="feature-head">
-          <h2>🔤 텍스트 추출</h2>
+          <h2><span class="eyebrow">01 / EXTRACT</span>텍스트 추출</h2>
           <button id="btn-add-rule" class="btn btn-primary" title="새 규칙을 추가하고 페이지에서 요소를 선택합니다">
-            + 요소 선택
+            <svg class="ic" aria-hidden="true"><use href="#i-target"/></svg>요소 선택
           </button>
         </section>
 
@@ -36,7 +37,7 @@
         <section id="rules" class="rules"></section>
 
         <p id="empty-hint" class="empty-hint">
-          <strong>＋ 요소 선택</strong> 버튼을 눌러 페이지의 요소를 선택하세요.<br />
+          <strong>요소 선택</strong> 버튼을 눌러 페이지의 요소를 선택하세요.<br />
           여러 개를 추가하면 아래에서 순서대로 조합됩니다.
         </p>
 
@@ -71,8 +72,8 @@
           <div class="result-box">
             <textarea id="result" rows="3" readonly placeholder="조합 결과가 여기에 표시됩니다"></textarea>
             <div class="result-actions">
-              <button id="btn-refresh" class="btn btn-ghost" title="현재 페이지에서 모든 요소를 다시 추출">↻ 재추출</button>
-              <button id="btn-copy" class="btn btn-primary">📋 복사</button>
+              <button id="btn-refresh" class="btn btn-ghost" title="현재 페이지에서 모든 요소를 다시 추출"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>재추출</button>
+              <button id="btn-copy" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>복사</button>
             </div>
           </div>
         </section>
@@ -95,7 +96,7 @@
         <!-- 잠금 / 최초 설정 -->
         <section class="card lock-card hidden" id="lock-screen">
           <div class="card-head">
-            <h2 id="lock-title">🔒 잠금 해제</h2>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><span id="lock-title">잠금 해제</span></h2>
           </div>
           <p class="muted hint-text" id="lock-hint"></p>
           <div class="field-col">
@@ -108,17 +109,17 @@
             <button id="btn-unlock" class="btn btn-primary">잠금 해제</button>
           </div>
           <p class="muted warn-text" id="lock-warn">
-            ⚠ 마스터 비밀번호는 어디에도 저장되지 않습니다. <b>분실하면 저장된 비밀번호를 복구할 수 없습니다.</b>
+            <svg class="ic ic-inline" aria-hidden="true"><use href="#i-alert"/></svg>마스터 비밀번호는 어디에도 저장되지 않습니다. <b>분실하면 저장된 비밀번호를 복구할 수 없습니다.</b>
           </p>
         </section>
 
         <!-- 사이트 목록 -->
         <section class="hidden" id="login-main">
           <section class="feature-head">
-            <h2>🔐 자동 로그인</h2>
+            <h2><span class="eyebrow">02 / AUTH</span>자동 로그인</h2>
             <div class="header-actions">
-              <button id="btn-lock-now-2" class="btn btn-ghost btn-sm" title="지금 잠그기">🔒</button>
-              <button id="btn-add-site" class="btn btn-primary">+ 사이트</button>
+              <button id="btn-lock-now-2" class="btn btn-ghost btn-sm" title="지금 잠그기"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></button>
+              <button id="btn-add-site" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>사이트</button>
             </div>
           </section>
 
@@ -138,18 +139,18 @@
       <!-- ================= 2차 인증 OTP ================= -->
       <div class="view hidden" id="view-approval">
         <section class="feature-head">
-          <h2>🔑 2차 인증 OTP 가져오기</h2>
+          <h2><span class="eyebrow">03 / OTP</span>2차 인증 OTP 가져오기</h2>
         </section>
 
         <section class="card">
           <div class="card-head">
-            <h2>메일 인증번호</h2>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>메일 인증번호</h2>
             <button id="btn-approval-otp" class="btn btn-primary btn-sm">인증번호 확인</button>
           </div>
           <p class="otp-code hidden" id="approval-otp-code"></p>
           <p class="muted hint-text hidden" id="approval-otp-info"></p>
           <div class="result-actions hidden" id="approval-otp-actions">
-            <button id="btn-approval-otp-copy" class="btn btn-ghost btn-sm">📋 복사</button>
+            <button id="btn-approval-otp-copy" class="btn btn-ghost btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><span>복사</span></button>
             <button id="btn-approval-otp-fill" class="btn btn-primary btn-sm" title="현재 탭의 인증번호 칸에 입력하고 확인 버튼을 누릅니다">입력 후 확인</button>
           </div>
           <p class="hint-text hidden" id="approval-otp-result"></p>
@@ -169,10 +170,13 @@
 
       <!-- ================= 설정 ================= -->
       <div class="view hidden" id="view-settings">
+        <section class="feature-head">
+          <h2><span class="eyebrow">04 / SYSTEM</span>설정</h2>
+        </section>
         <!-- 보안 -->
         <section class="card" id="security-card">
           <div class="card-head">
-            <h2>🔐 보안 (자동 로그인)</h2>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>보안 <span class="muted">(자동 로그인)</span></h2>
             <span class="kbd" id="sec-status">…</span>
           </div>
           <div class="combine-opts">
@@ -206,7 +210,7 @@
         <!-- 동기화 -->
         <section class="card">
           <div class="card-head">
-            <h2>동기화 (PC 간)</h2>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg>동기화 <span class="muted">(PC 간)</span></h2>
             <span class="kbd" id="sync-badge">…</span>
           </div>
           <p class="muted hint-text">
@@ -222,7 +226,7 @@
         <!-- 단축키 -->
         <section class="shortcut card">
           <div class="card-head">
-            <h2>단축키</h2>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-keyboard"/></svg>단축키</h2>
             <button id="btn-change-shortcut" class="btn btn-ghost btn-sm">단축키 변경…</button>
           </div>
           <ul class="kv">

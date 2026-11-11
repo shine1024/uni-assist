@@ -3,6 +3,7 @@
 // 역할: 잠금/해제 UI, 사이트·계정 CRUD, 셀렉터 선택(picker.js 재사용), 보안·동기화 설정.
 // 비밀번호 평문은 **저장 직전까지만** 메모리에 두고, 저장/화면 이동 시 즉시 폐기한다.
 
+import { icon } from "./icons.js";
 import { encryptSecret } from "../lib/crypto.js";
 import {
   DEFAULT_PANEL_COMBO,
@@ -110,7 +111,7 @@ async function refreshLockUI() {
   $("#login-main").classList.toggle("hidden", locked || !!editing);
 
   if (!st.initialized) {
-    $("#lock-title").textContent = "🔑 마스터 비밀번호 설정";
+    $("#lock-title").textContent = "마스터 비밀번호 설정";
     $("#lock-hint").innerHTML =
       "저장할 비밀번호를 암호화할 마스터 비밀번호를 정하세요. (AES-256-GCM, PBKDF2-SHA256)<br />" +
       "<b>다른 PC에서 이미 설정했다면 새로 만들지 말고 그 비밀번호를 입력하세요.</b> " +
@@ -119,7 +120,7 @@ async function refreshLockUI() {
     $("#master-pw2").classList.remove("hidden");
     $("#btn-unlock").textContent = "설정하고 시작";
   } else if (locked) {
-    $("#lock-title").textContent = "🔒 잠금 해제";
+    $("#lock-title").textContent = "잠금 해제";
     $("#lock-hint").textContent = "자동 로그인을 쓰려면 마스터 비밀번호를 입력하세요.";
     $("#master-pw").placeholder = "마스터 비밀번호";
     $("#master-pw2").classList.add("hidden");
@@ -144,11 +145,11 @@ async function doUnlock() {
       if (pw.length < 8) return lockError("마스터 비밀번호는 8자 이상이어야 합니다");
       if (pw !== pw2) return lockError("두 비밀번호가 일치하지 않습니다");
       await vault.initVault(pw);
-      toast("마스터 비밀번호 설정 완료 ✓");
+      toast("마스터 비밀번호 설정 완료");
     } else {
       if (!pw) return lockError("마스터 비밀번호를 입력하세요");
       if (!(await vault.unlock(pw))) return lockError("마스터 비밀번호가 일치하지 않습니다");
-      toast("잠금 해제 ✓");
+      toast("잠금 해제");
     }
   } catch (e) {
     if (e.code === vault.ERR_SYNC_PENDING) {
@@ -168,7 +169,7 @@ async function doUnlock() {
   // 단축키로 시도했다가 잠금 때문에 보류된 자동 로그인을 이어서 실행
   try {
     const r = await chrome.runtime.sendMessage({ type: "LOGIN_RETRY_PENDING" });
-    if (r && r.ok) toast("보류된 자동 로그인을 실행했어요 ✓");
+    if (r && r.ok) toast("보류된 자동 로그인을 실행했어요");
     else if (r && r.message && r.code !== "NO_PENDING") toast(r.message);
   } catch (_) {
     /* 보류 요청 없음 */
@@ -239,13 +240,13 @@ function siteRowHTML(s, isCurrent) {
       </div>
       <div class="site-url">${esc(s.origin + (s.matchPath ? s.path : ""))}</div>
       <div class="site-meta muted">계정 ${accounts.length}개 · 비밀번호 저장 ${withPw}개${
-        s.sel && s.sel.logout && s.autoLogout !== false ? " · 로그아웃 ✓" : ""
+        s.sel && s.sel.logout && s.autoLogout !== false ? " · 로그아웃 사용" : ""
       }</div>
     </div>
     <div class="site-side">
-      <button class="btn btn-sm btn-icon" data-action="run" title="지금 실행 (로그인 상태면 로그아웃)">▶</button>
+      <button class="btn btn-sm btn-icon" data-action="run" title="지금 실행 (로그인 상태면 로그아웃)">${icon("play")}</button>
       <button class="btn btn-sm" data-action="edit">수정</button>
-      <button class="btn btn-sm btn-icon btn-danger" data-action="del" title="사이트 삭제">🗑</button>
+      <button class="btn btn-sm btn-icon btn-danger" data-action="del" title="사이트 삭제">${icon("trash")}</button>
     </div>
   </div>`;
 }
@@ -287,7 +288,7 @@ function renderDetail() {
   <section class="card">
     <div class="card-head">
       <h2>${s.updatedAt ? "사이트 수정" : "사이트 추가"}</h2>
-      <button class="btn btn-ghost btn-sm" data-action="close">← 목록</button>
+      <button class="btn btn-ghost btn-sm" data-action="close">${icon("back")}목록</button>
     </div>
     <div class="field-col">
       <label class="muted">사이트명</label>
@@ -299,7 +300,7 @@ function renderDetail() {
         경로까지 일치할 때만 <b>로그인</b> <span class="muted">(끄면 도메인 전체 — 권장)</span></label>
       ${
         s.matchPath
-          ? `<p class="muted">⚠ 로그인은 <code>${esc(describeSiteUrl(s.url) ? describeSiteUrl(s.url).path : s.path)}</code>
+          ? `<p class="muted">${icon("alert", "ic-inline")}로그인은 <code>${esc(describeSiteUrl(s.url) ? describeSiteUrl(s.url).path : s.path)}</code>
              및 그 하위 경로에서만 동작합니다. 로그인 페이지 경로(<code>/login</code> 등)로 등록했다면
              로그인 후 다른 경로로 이동했을 때 동작하지 않으니, 끄거나 URL을 앱 루트로 고치세요.
              <b>로그아웃은 경로와 무관하게</b> 도메인이 같으면 동작합니다.</p>`
@@ -355,7 +356,7 @@ function renderDetail() {
   </section>
 
   <div class="result-actions">
-    <button class="btn btn-ghost" data-action="test" title="현재 탭에서 실행 (로그인 상태면 로그아웃)">▶ 지금 실행해 보기</button>
+    <button class="btn btn-ghost" data-action="test" title="현재 탭에서 실행 (로그인 상태면 로그아웃)">${icon("play")}지금 실행해 보기</button>
     <button class="btn btn-primary" data-action="save">저장</button>
   </div>`;
 }
@@ -385,13 +386,13 @@ function accountHTML(a, i, defaultId) {
       <label class="chk" title="기본 계정 — 계정이 여러 개일 때 선택창에서 맨 위에 오고 포커스됩니다 (Enter 로 바로 실행)">
         <input type="radio" name="def-acc" data-af="isDefault" ${defaultId === a.id ? "checked" : ""} /> 먼저
       </label>
-      <button class="btn btn-icon btn-danger" data-action="del-acc" title="계정 삭제">🗑</button>
+      <button class="btn btn-icon btn-danger" data-action="del-acc" title="계정 삭제">${icon("trash")}</button>
     </div>
     <input data-af="username" autocomplete="off" placeholder="아이디" value="${esc(a.username)}" />
     <input data-af="password" type="password" autocomplete="new-password"
       placeholder="${has ? "비밀번호 (변경할 때만 입력)" : "비밀번호"}" />
     <div class="acc-state ${has || typed ? "" : "bad"}">${
-      typed ? "✎ 입력됨 — 저장하면 암호화됩니다" : has ? "🔒 암호화되어 저장됨" : "⚠ 비밀번호 없음"
+      typed ? "입력됨 — 저장하면 암호화됩니다" : has ? "암호화되어 저장됨" : "비밀번호 없음"
     }</div>
   </div>`;
 }
@@ -425,7 +426,7 @@ chrome.runtime.onMessage.addListener((msg) => {
 
   const field = msg.ruleId.slice("login:".length);
   editing.sel[field] = msg.selector || "";
-  selState[field] = { ok: true, text: "✓ 선택됨" };
+  selState[field] = { ok: true, text: "선택됨" };
 
   // 비밀번호 칸에 비밀번호가 아닌 요소를 고르면 알려준다
   if (field === "pass" && msg.isSecret === false) {
@@ -448,18 +449,18 @@ async function verifySelectors() {
   for (const f of FIELDS) {
     const sel = (editing.sel[f.key] || "").trim();
     if (!sel) {
-      selState[f.key] = f.required ? { ok: false, text: "✗ 비어 있음" } : null;
+      selState[f.key] = f.required ? { ok: false, text: "비어 있음" } : null;
       continue;
     }
     if (!isValidSelector(sel)) {
-      selState[f.key] = { ok: false, text: "✗ 문법 오류" };
+      selState[f.key] = { ok: false, text: "문법 오류" };
       continue;
     }
     // source:"attr" 로 조회해 값(특히 비밀번호)을 읽지 않는다
     const resp = await chrome.tabs
       .sendMessage(tab.id, { type: "EXTRACT", selector: sel, index: 0, source: "attr", attrName: "id" })
       .catch(() => null);
-    selState[f.key] = resp && resp.found ? { ok: true, text: "✓ 찾음" } : { ok: false, text: "✗ 못 찾음" };
+    selState[f.key] = resp && resp.found ? { ok: true, text: "찾음" } : { ok: false, text: "못 찾음" };
   }
   renderDetail();
 }
@@ -505,7 +506,7 @@ async function saveDetail() {
     return toast("저장 실패: " + e.message);
   }
   wipeSecrets();
-  toast("저장됨 ✓");
+  toast("저장됨");
   closeDetail();
   await refreshAll();
 }
@@ -524,7 +525,7 @@ async function renderSettings(st) {
     ? "미설정"
     : s.unlocked
       ? `해제됨 · ${remainText(s.expiresAt)}`
-      : "🔒 잠김";
+      : "잠김";
   $("#auto-lock-min").value = String(s.autoLockMinutes);
   $("#btn-toggle-change-master").classList.toggle("hidden", !s.initialized);
 
@@ -723,7 +724,7 @@ function bindStaticEvents() {
 
   $("#btn-lock-now-2").addEventListener("click", async () => {
     await vault.lock();
-    toast("잠갔습니다 🔒");
+    toast("잠갔습니다");
     await refreshAll();
   });
 
@@ -756,7 +757,7 @@ function bindStaticEvents() {
           siteId: site.id,
           tabId: tab && tab.id,
         });
-        toast(r && r.ok ? "자동 로그인 실행 ✓" : (r && r.message) || "실행 실패");
+        toast(r && r.ok ? "자동 로그인 실행" : (r && r.message) || "실행 실패");
         break;
       }
     }
@@ -851,7 +852,7 @@ function bindStaticEvents() {
           siteId: editing.id,
           tabId: tab && tab.id,
         });
-        toast(r && r.ok ? "자동 로그인 실행 ✓" : (r && r.message) || "실행 실패");
+        toast(r && r.ok ? "자동 로그인 실행" : (r && r.message) || "실행 실패");
         break;
       }
     }
@@ -867,7 +868,7 @@ function bindStaticEvents() {
 
   $("#btn-lock-now").addEventListener("click", async () => {
     await vault.lock();
-    toast("잠갔습니다 🔒");
+    toast("잠갔습니다");
     await refreshAll();
   });
 
@@ -908,7 +909,7 @@ function bindStaticEvents() {
     if (nw !== nw2) return show("새 비밀번호가 일치하지 않습니다");
     try {
       const r = await vault.changeMaster(oldPw, nw);
-      toast(`변경 완료 ✓ (비밀번호 ${r.reencrypted}건 재암호화)`);
+      toast(`변경 완료 (비밀번호 ${r.reencrypted}건 재암호화)`);
       $("#change-master-form").classList.add("hidden");
     } catch (e) {
       return show(e.message);
