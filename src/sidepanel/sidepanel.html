@@ -223,6 +223,22 @@
           <p class="muted" id="sync-info">…</p>
         </section>
 
+        <!-- 백업 -->
+        <section class="card">
+          <div class="card-head">
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-archive"/></svg>백업</h2>
+          </div>
+          <p class="muted hint-text">
+            자동 로그인 사이트·계정(비밀번호는 <b>암호화된 그대로</b>)과 텍스트 추출 규칙·프리셋을 파일로 옮깁니다.
+            가져온 뒤에는 백업할 때의 <b>마스터 비밀번호</b>로 잠금을 해제하세요.
+          </p>
+          <div class="result-actions">
+            <button id="btn-backup-import" class="btn btn-ghost btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg>가져오기</button>
+            <button id="btn-backup-export" class="btn btn-primary btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>내보내기</button>
+          </div>
+          <input id="backup-file" type="file" accept="application/json,.json" class="hidden" />
+        </section>
+
         <!-- 단축키 -->
         <section class="shortcut card">
           <div class="card-head">

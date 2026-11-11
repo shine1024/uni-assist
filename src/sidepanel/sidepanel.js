@@ -6,6 +6,7 @@ import { parsePatterns } from "../lib/match.js";
 import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
 import { initLoginUI, onViewShown } from "./login.js";
 import { initApprovalUI, onApprovalShown } from "./approval.js";
+import { initBackupUI } from "./backup.js";
 import { DEFAULT_PANEL_COMBO, comboFromEvent, isTypingTarget, needsTypingGuard, normalizeHotkey } from "../lib/hotkey.js";
 import { K_SETTINGS } from "../lib/login-store.js";
 
@@ -549,6 +550,7 @@ function toast(msg) {
 // ---- 메뉴(뷰) 전환 -------------------------------------------------------
 const VIEWS = ["extract", "login", "approval", "settings"];
 initApprovalUI();
+initBackupUI({ toast });
 
 function showView(name) {
   VIEWS.forEach((v) => $(`#view-${v}`).classList.toggle("hidden", v !== name));
