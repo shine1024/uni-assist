@@ -180,7 +180,7 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
   새로 설정하면 기존 비밀번호를 열 수 없게 되므로, 그런 상태를 감지하면 설정을 막고 안내합니다.
 - 동기화는 **확장 프로그램 ID가 같을 때만** 공유됩니다. 압축해제 로드는 원래 폴더 경로에 따라 ID가 달라지므로,
   `manifest.json` 의 `key` 로 ID를 **`gknfpjcapdfgainlgjglmooolalpifml`** 로 고정해 두었습니다. 어느 PC, 어느 폴더에 받아도 같은 ID입니다.
-  (2차 인증 기능을 흡수한 `unipost-2fa-helper` 의 ID 를 이어받아, 슬랙 앱에 등록된 Redirect URL 을 그대로 씁니다. 두 확장은 함께 설치할 수 없습니다)
+  이 ID 의 Redirect URL 이 슬랙 앱에 등록돼 있으므로 **ID(=`key`)를 바꾸면 슬랙 연결이 깨집니다.**
   - 고정 전 버전을 쓰던 PC는 ID가 바뀌어 기존 데이터가 보이지 않습니다. 이전 버전에서 **설정 → 백업 → 내보내기** 한 파일을
     새 버전에서 **가져오기** 하고, 2차 인증 메뉴에서 **슬랙으로 연결**을 다시 누르세요.
 - 용량 제한(Chrome 공식): 전체 **100KB**, 항목당 **8KB**, 최대 512항목. 사이트 1개 = sync 항목 1개로 나눠 저장합니다.
@@ -189,7 +189,7 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
 ## 2차 인증 OTP 가져오기
 
 인증 메일은 메일→슬랙 연동으로 **본인 슬랙 DM** 에 메일 파일로 올라옵니다. 확장은 그 DM 을 읽어 제목에
-「로그인 2차 인증 번호」가 들어간 메일에서 8자리 번호를 꺼냅니다(`unipost-2fa-helper` 와 같은 방식).
+「로그인 2차 인증 번호」가 들어간 메일에서 8자리 번호를 꺼냅니다.
 메일 서버 정보나 별도 설치 프로그램은 필요 없습니다.
 
 사이드 패널 **2차 인증 → 인증번호 확인**:
@@ -202,12 +202,17 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
 
 ### 준비
 
-1. **슬랙 앱**: *Unipost 2FA Reader* 의 Redirect URL `https://gknfpjcapdfgainlgjglmooolalpifml.chromiumapp.org/` 를 그대로 씁니다
-   (2fa-helper 와 같은 확장 ID). User Token Scopes: `im:history`, `im:read`, `files:read`.
-   **2fa-helper 가 설치돼 있으면 먼저 삭제하세요** — 같은 ID 라 함께 설치할 수 없습니다.
-2. **각 PC**: `slack-config.example.json` 을 `slack-config.json` 으로 복사해 Client ID/Secret 을 넣고 확장을 새로고침합니다.
-   이 파일은 Secret 이 들어 있어 **git 에서 제외**했습니다. 팀 외부로 공유하지 마세요.
-3. 패널 **2차 인증 → 슬랙으로 연결** → 슬랙 창에서 **허용**. 본인 DM 은 자동으로 찾습니다.
+확장 안에서 끝납니다. 따로 설치하거나 파일을 복사할 것은 없습니다.
+
+1. 패널 **2차 인증 → 슬랙 연결** 카드에 **슬랙 앱 정보(Client ID / Client Secret)** 를 처음 한 번 입력하고 저장합니다.
+   값은 api.slack.com/apps → *Unipost 2FA Reader* → Basic Information → App Credentials 에 있습니다.
+   **크롬 동기화**로 같은 구글 계정의 다른 PC 에도 전달되므로 PC 마다 다시 입력할 필요가 없습니다.
+   (저장소가 공개라 Secret 을 코드에 넣지 않았습니다. 팀 외부로 공유하지 마세요)
+2. **슬랙으로 연결** → 슬랙 창에서 **허용**. 본인 DM 은 자동으로 찾습니다.
+
+슬랙 앱 설정(관리자): Redirect URL `https://gknfpjcapdfgainlgjglmooolalpifml.chromiumapp.org/`,
+User Token Scopes `im:history`, `im:read`, `files:read`. 둘 다 이미 설정돼 있습니다.
+앱 정보는 패널 **고급 → 슬랙 앱 정보 변경**에서 바꿀 수 있고, 사용자 토큰(`xoxp-`)이 있으면 **고급 → 토큰으로 연결**도 됩니다.
 
 슬랙 사용자 토큰은 **이 PC 의 `chrome.storage.local` 에만** 저장합니다(동기화·백업 제외, 웹페이지 스크립트는 읽을 수 없음).
 **연결 해제**를 누르면 슬랙에서도 토큰을 폐기합니다. `im:history` 는 본인 DM 전체를 읽을 수 있는 권한이니 공용 PC 에서는 연결하지 마세요.
@@ -216,8 +221,9 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
 
 | 안내 | 조치 |
 |---|---|
-| 슬랙 앱 정보가 없어요 | `slack-config.json` 작성 후 확장 새로고침 |
-| `redirect_uri did not match` / 앱 정보를 확인하세요 | 슬랙 앱 Redirect URLs 에 위 주소 등록, Client ID/Secret 오타 확인 |
+| 슬랙 앱 정보를 입력하세요 | 슬랙 연결 카드에 Client ID / Client Secret 입력 |
+| `redirect_uri did not match` | 확장 ID 가 `gknfpjcap…` 인지 확인(`chrome://extensions`) |
+| 앱 정보를 확인하세요 | 고급 → 슬랙 앱 정보 변경에서 Client ID / Secret 오타 확인 |
 | 슬랙 앱 권한을 확인하세요 | 슬랙 앱 User Token Scopes 확인 후 다시 연결 |
 | 슬랙 연결이 만료됐어요 | 다시 연결 |
 | 3분 안에 인증 메일이 오지 않았어요 | 슬랙 DM 에 메일이 올라오는지, 제목 문구(`approval-config.js` 의 `titleKeyword`) 확인 |
@@ -230,7 +236,6 @@ Chrome `commands` API는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 하�
 ```
 uni-assist/
 ├─ manifest.json              # MV3 매니페스트
-├─ slack-config.example.json  # 슬랙 앱 Client ID/Secret 예시 (slack-config.json 으로 복사, git 제외)
 ├─ icons/                     # 아이콘 (tools/make-icons.py 로 생성)
 ├─ src/
 │  ├─ background/service-worker.js   # 패널 열기 + 단축키(복사 / 자동 로그인) (ES 모듈)
@@ -255,6 +260,7 @@ uni-assist/
 │     ├─ login-store.js              #   사이트·계정 저장 (chrome.storage.sync, 분할 저장)
 │     ├─ vault.js                    #   마스터 비밀번호·잠금 세션
 │     ├─ slack-otp.js                #   슬랙 DM 조회·인증번호 추출·OAuth
+│     ├─ slack-app.js                #   슬랙 앱 정보(Client ID/Secret) — storage.sync
 │     ├─ backup.js                   #   백업 파일 만들기/읽기
 │     └─ tabs.js                     #   활성 탭 조회/콘텐츠 스크립트 주입
 ├─ tools/
@@ -264,7 +270,7 @@ uni-assist/
 │  ├─ test-vault.mjs          # 저장소·마스터 비밀번호·동기화 가드 (가짜 chrome.storage, 62종)
 │  ├─ test-hotkey.mjs         # 단축키 조합·후보 선정·매치 패턴 + 복제 로직 동기화 (60종)
 │  ├─ test-approval-flow.mjs  # 2차 인증 입력·요청 출처·권한 (35종)
-│  ├─ test-slack-otp.mjs      # 슬랙 DM 조회·번호 추출·OAuth (가짜 fetch, 33종)
+│  ├─ test-slack-otp.mjs      # 슬랙 DM 조회·번호 추출·OAuth·앱 정보 저장 (가짜 fetch, 40종)
 │  ├─ test-backup.mjs         # 백업 내보내기/가져오기 (14종)
 │  └─ test-all.mjs            # 전체 실행
 └─ docs/                      # 개발 이력 / 작업 세션 관리 → docs/CONTINUE-HERE.md 참고
@@ -273,7 +279,7 @@ uni-assist/
 ## 테스트
 
 ```bash
-node tools/test-all.mjs          # 전체 (290종)
+node tools/test-all.mjs          # 전체 (297종)
 node tools/test-transform.mjs    # 텍스트 추출만 (18종)
 node tools/test-login.mjs        # 암호화·키 지문·URL 매칭 (65종)
 node tools/test-vault.mjs        # 저장소·잠금·마스터 변경·동기화 가드 (62종)

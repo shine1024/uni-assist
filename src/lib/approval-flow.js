@@ -2,7 +2,7 @@
 // 오류 안내에는 토큰과 인증번호를 넣지 않는다.
 
 const MESSAGES = {
-  SLACK_CONFIG_MISSING: "슬랙 앱 정보가 없어요. slack-config.json 을 만들고 확장을 새로고침하세요",
+  SLACK_CONFIG_MISSING: "슬랙 앱 정보(Client ID / Client Secret)를 입력하세요",
   SLACK_CONFIG_INVALID: "슬랙 앱 정보(Client ID/Secret, Redirect URL)를 확인하세요",
   SLACK_NOT_CONNECTED: "슬랙에 연결되지 않았어요. 아래에서 슬랙으로 연결하세요",
   SLACK_AUTH_CANCELLED: "슬랙 연결을 취소했어요",

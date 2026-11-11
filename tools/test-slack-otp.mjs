@@ -163,5 +163,36 @@ console.log("OAuth");
   eq(await codeOf(exchangeCode({ clientId: "C", clientSecret: "S", code: "c", redirectUri: "r" }, noUser)), "SLACK_MISSING_SCOPE", "사용자 토큰이 없으면 권한 안내");
 }
 
+console.log("슬랙 앱 정보 저장");
+{
+  const sync = {};
+  let file = null;
+  globalThis.chrome = {
+    runtime: { getURL: (p) => `chrome-extension://x/${p}` },
+    storage: {
+      sync: {
+        get: async (k) => (k in sync ? { [k]: sync[k] } : {}),
+        set: async (o) => Object.assign(sync, o),
+      },
+    },
+  };
+  globalThis.fetch = async () => {
+    if (!file) throw new TypeError("not found");
+    return { json: async () => file };
+  };
+  const { K_SLACK_APP, loadSlackApp, saveSlackApp } = await import("../src/lib/slack-app.js");
+
+  eq(await codeOf(loadSlackApp()), "SLACK_CONFIG_MISSING", "저장된 값도 파일도 없으면 입력 안내");
+  file = { clientId: "C-file", clientSecret: "S-file" };
+  eq(await loadSlackApp(), { clientId: "C-file", clientSecret: "S-file" }, "예전 slack-config.json 이 있으면 읽음");
+  eq(sync[K_SLACK_APP], { clientId: "C-file", clientSecret: "S-file" }, "읽은 값은 동기화 저장소로 옮김");
+  file = null;
+  eq((await loadSlackApp()).clientId, "C-file", "이후에는 파일 없이도 동작");
+  eq(await codeOf(saveSlackApp({ clientId: "C2", clientSecret: " " })), "SLACK_CONFIG_MISSING", "빈 Secret 거부");
+  await saveSlackApp({ clientId: " C2 ", clientSecret: "S2" });
+  eq(sync[K_SLACK_APP], { clientId: "C2", clientSecret: "S2" }, "패널에서 입력한 값 저장");
+  eq(K_SLACK_APP.startsWith("ua_"), false, "백업 파일에 들어가지 않는 키(ua_ 접두어 없음)");
+}
+
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

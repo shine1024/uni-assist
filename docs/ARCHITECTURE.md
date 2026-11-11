@@ -28,7 +28,7 @@
 - `commands` (매니페스트 키) — 단축키 `copy-combined`, `auto-login` (전역)
 - 페이지 내 단축키(F2)는 권한 없이 `scripting` + 기존 `host_permissions` 로 동적 등록
 - `identity` — 2차 인증의 슬랙 OAuth(`chrome.identity.launchWebAuthFlow`, Redirect `https://<확장ID>.chromiumapp.org/`)
-- `key` (매니페스트 키) — 확장 ID 고정 `gknfpjcapdfgainlgjglmooolalpifml` — `unipost-2fa-helper` 의 key 를 이어받음(슬랙 앱 Redirect URL 이 이 ID 로 등록돼 있음). 동기화·Redirect URL 이 ID 에 묶인다
+- `key` (매니페스트 키) — 확장 ID 고정 `gknfpjcapdfgainlgjglmooolalpifml` — 슬랙 앱 Redirect URL 이 이 ID 로 등록돼 있다(예전 unipost-2fa-helper 의 key). 동기화·Redirect URL 이 ID 에 묶이므로 바꾸지 않는다
 
 > 자동 로그인은 **새 권한을 추가하지 않는다.** 기존 `storage`(+`storage.session`은 추가 권한 불필요),
 > `scripting`, `tabs`/`activeTab`, `host_permissions` 만으로 구현했다(최소 권한 원칙).

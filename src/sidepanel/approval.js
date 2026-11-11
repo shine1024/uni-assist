@@ -1,7 +1,8 @@
 // 사이드 패널: 2차 인증 OTP 화면 (슬랙 DM 에서 인증번호 가져오기)
 import { APPROVAL_CONFIG } from "../lib/approval-config.js";
 import { ApprovalError, messageForError } from "../lib/approval-flow.js";
-import { buildAuthUrl, createSlackClient, exchangeCode, parseAuthRedirect, validateSlackConfig } from "../lib/slack-otp.js";
+import { loadSlackApp, saveSlackApp } from "../lib/slack-app.js";
+import { buildAuthUrl, createSlackClient, exchangeCode, parseAuthRedirect } from "../lib/slack-otp.js";
 
 const $ = (selector) => document.querySelector(selector);
 const K_SLACK = "ua_slack"; // background/approval.js 와 같은 키
@@ -18,13 +19,52 @@ async function refreshStatus() {
   $("#slack-status").classList.toggle("on", st.connected);
   $("#slack-user").textContent = st.connected ? `${st.user}${st.team ? ` · ${st.team}` : ""}` : "—";
   $("#slack-redirect").textContent = st.redirectUrl;
-  $("#slack-config-hint").classList.toggle("hidden", st.configured);
+  configured = st.configured;
+  // 앱 정보가 없으면 입력칸을 먼저 보여 준다(처음 한 번). 있으면 고급 → 변경 으로만 연다.
+  if (!st.configured) showAppForm(true);
+  else if (!editingApp) showAppForm(false);
   $("#btn-slack-connect").classList.toggle("hidden", st.connected);
   $("#btn-slack-connect").disabled = !st.configured;
   $("#btn-slack-disconnect").classList.toggle("hidden", !st.connected);
   $("#slack-token-box").classList.toggle("hidden", st.connected);
   $("#otp-autofill").checked = st.autoFill;
   $("#otp-autofill").disabled = !st.connected;
+}
+
+let configured = false;
+let editingApp = false;
+
+function showAppForm(show) {
+  $("#slack-app-form").classList.toggle("hidden", !show);
+  $("#btn-slack-app-cancel").classList.toggle("hidden", !(show && configured));
+  if (!show) {
+    editingApp = false;
+    $("#slack-client-secret").value = "";
+  }
+}
+
+async function editApp() {
+  editingApp = true;
+  try {
+    $("#slack-client-id").value = (await loadSlackApp()).clientId;
+  } catch {
+    /* 아직 없음 */
+  }
+  $("#slack-client-secret").value = "";
+  showAppForm(true);
+  $("#slack-client-id").focus();
+}
+
+async function saveApp() {
+  showSlackError(null);
+  try {
+    await saveSlackApp({ clientId: $("#slack-client-id").value, clientSecret: $("#slack-client-secret").value });
+    showAppForm(false);
+  } catch (err) {
+    showSlackError(err);
+    return;
+  }
+  refreshStatus();
 }
 
 function showSlackError(err) {
@@ -38,13 +78,7 @@ async function connectSlack() {
   button.disabled = true;
   showSlackError(null);
   try {
-    let raw = null;
-    try {
-      raw = await (await fetch(chrome.runtime.getURL("slack-config.json"))).json();
-    } catch {
-      /* 파일 없음 → 아래에서 안내 */
-    }
-    const { clientId, clientSecret } = validateSlackConfig(raw);
+    const { clientId, clientSecret } = await loadSlackApp();
     const redirectUri = chrome.identity.getRedirectURL();
     const state = crypto.randomUUID();
 
@@ -79,7 +113,7 @@ async function saveConnection(token) {
   });
 }
 
-/** OAuth 대신 이미 발급된 사용자 토큰(xoxp-)을 불러와 연결한다. 예: unipost-2fa-helper 설정의 「고급: 직접 설정」 토큰 */
+/** OAuth 대신 이미 발급된 사용자 토큰(xoxp-)으로 연결한다. */
 async function connectWithToken() {
   const input = $("#slack-token");
   const button = $("#btn-slack-token");
@@ -239,6 +273,10 @@ export function initApprovalUI() {
   $("#btn-slack-connect").addEventListener("click", connectSlack);
   $("#btn-slack-disconnect").addEventListener("click", disconnectSlack);
   $("#btn-slack-token").addEventListener("click", connectWithToken);
+  $("#btn-slack-app-edit").addEventListener("click", editApp);
+  $("#btn-slack-app-save").addEventListener("click", saveApp);
+  $("#btn-slack-app-cancel").addEventListener("click", () => showAppForm(false));
+  $("#slack-client-secret").addEventListener("keydown", (e) => e.key === "Enter" && saveApp());
   $("#slack-token").addEventListener("keydown", (e) => e.key === "Enter" && connectWithToken());
   $("#otp-autofill").addEventListener("change", async (e) => {
     await chrome.runtime.sendMessage({ type: "APPROVAL_SET_AUTOFILL", on: e.target.checked }).catch(() => null);

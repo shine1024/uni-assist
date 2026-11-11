@@ -27,8 +27,9 @@
 - 본인 슬랙 DM 에 올라온 인증 메일 파일(제목 「로그인 2차 인증 번호」)에서 8자리 번호. `src/lib/slack-otp.js`
 - 패널: 인증번호 확인(없으면 3분 대기) → 복사 / 입력 후 확인(`input.fid-authPass` + `.bid-confirm`). 「슬랙 연결」 카드에서 OAuth 연결·해제
 - 「포털 인증 화면이 뜨면 자동으로 입력」 체크 시 `src/content/otp-auto.js` 를 포털에 동적 등록
-- Client ID/Secret 은 git 제외 `slack-config.json`(예시 `slack-config.example.json`). 슬랙 앱 Redirect URL 은
-  2fa-helper 것(`https://gknfpjcapdfgainlgjglmooolalpifml.chromiumapp.org/`)을 그대로 쓴다 — 같은 ID
+- Client ID/Secret 은 패널에서 한 번 입력 → `storage.sync` 키 `slack_app`(`src/lib/slack-app.js`, 백업 제외).
+  저장소가 공개라 코드에 넣지 않는다. 예전 `slack-config.json`(git 제외)이 있으면 한 번 읽어 옮긴다.
+  Redirect URL 은 `https://gknfpjcapdfgainlgjglmooolalpifml.chromiumapp.org/` — 확장 ID 에 묶임
 - POP3 네이티브 호스트(`host/`, `install/`)는 제거. git 기록(v0.5.0)에 남아 있음
 - **미확인: 실제 슬랙 연결·DM 조회, 포털 자동 입력, 입력 후 확인**
 

@@ -42,7 +42,7 @@ console.log("안내 문구");
 {
   eq(messageForError({ code: "OTP_TIMEOUT" }).includes("인증 메일"), true, "3분 안에 메일 없음 안내");
   eq(messageForError({ code: "SLACK_NOT_CONNECTED" }).includes("연결"), true, "슬랙 미연결 안내");
-  eq(messageForError({ code: "SLACK_CONFIG_MISSING" }).includes("slack-config.json"), true, "앱 정보 없음은 파일 이름까지 안내");
+  eq(messageForError({ code: "SLACK_CONFIG_MISSING" }).includes("Client ID"), true, "앱 정보 없음은 입력할 값까지 안내");
   eq(messageForError({ code: "OTP_INPUT_NOT_FOUND" }).includes("입력칸"), true, "입력칸 없음 안내");
 }
 

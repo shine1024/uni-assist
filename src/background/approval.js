@@ -4,7 +4,8 @@
 // 조회는 한 번씩만 한다. 메일이 아직 안 왔으면 { pending: true } 를 돌려주고, 기다리는 반복은 부른 쪽이 한다.
 import { APPROVAL_CONFIG } from "../lib/approval-config.js";
 import { ApprovalError, messageForError } from "../lib/approval-flow.js";
-import { createSlackClient, fetchLatestOtp, validateSlackConfig } from "../lib/slack-otp.js";
+import { loadSlackApp } from "../lib/slack-app.js";
+import { createSlackClient, fetchLatestOtp } from "../lib/slack-otp.js";
 import { pageFillOtp } from "./approval-page-actions.js";
 
 export const K_SLACK = "ua_slack"; // { token, channelId, user, team, lastUsedTs, autoFill }
@@ -21,23 +22,12 @@ async function patchSlack(patch) {
   await chrome.storage.local.set({ [K_SLACK]: { ...(await getSlack()), ...patch } });
 }
 
-/** 확장 폴더의 slack-config.json (git 제외). 없거나 TODO 면 SLACK_CONFIG_MISSING */
-export async function loadSlackConfig() {
-  let raw = null;
-  try {
-    raw = await (await fetch(chrome.runtime.getURL("slack-config.json"))).json();
-  } catch {
-    /* 파일 없음 */
-  }
-  return validateSlackConfig(raw);
-}
-
 /** 사이드 패널 표시용 */
 export async function approvalStatus() {
   const s = await getSlack();
   let configured = true;
   try {
-    await loadSlackConfig();
+    await loadSlackApp();
   } catch {
     configured = false;
   }
