@@ -22,6 +22,12 @@ const MESSAGES = {
   OTP_SUBMIT_NOT_FOUND: "현재 탭에서 확인 버튼을 찾지 못했어요",
   PAGE_ACTION_FAILED: "현재 탭에는 입력할 수 없어요",
   BAD_REQUEST: "요청이 올바르지 않아요",
+  CLAUDE_LINK_NOT_FOUND: "보안 링크 메일은 찾았지만 메일에서 링크를 꺼내지 못했어요 — 「진단」 결과를 확인하세요",
+  CLAUDE_TAB_FAILED: "보안 링크 페이지를 열지 못했어요",
+  CLAUDE_CODE_NOT_FOUND:
+    "보안 링크 페이지에서 인증 코드를 찾지 못했어요. 링크가 만료됐거나 이미 쓴 링크일 수 있어요 — 「다시 보내기」를 누르고, 계속되면 「진단」 결과를 확인하세요",
+  CLAUDE_INPUT_NOT_FOUND: "현재 탭에서 Claude 인증 코드 입력칸을 찾지 못했어요",
+  CLAUDE_SUBMIT_NOT_FOUND: "현재 탭에서 「이메일 주소 확인」 버튼을 찾지 못했어요",
 };
 
 export class ApprovalError extends Error {

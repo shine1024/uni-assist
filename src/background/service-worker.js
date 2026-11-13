@@ -31,6 +31,17 @@ import {
   syncAutoFillRegistration,
 } from "./approval.js";
 import { otpAction } from "./otp.js";
+import {
+  K_CLAUDE,
+  claudeStatus,
+  diagnoseClaude,
+  fetchClaudeCode,
+  fillClaudeCodeInActiveTab,
+  isClaudeAutoSender,
+  resetClaudeUsed,
+  setClaudeAutoFill,
+  syncClaudeAutoRegistration,
+} from "./claude-login.js";
 
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -41,6 +52,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // 설치·업데이트·다시 불러오기 직후에도 이미 열린 탭에서 F2/F4 가 바로 되도록 직접 심는다.
   syncHotkeyRegistration().then(injectHotkeyIntoOpenTabs);
   syncAutoFillRegistration();
+  syncClaudeAutoRegistration();
   // 텍스트 추출 규칙: 예전 단일 묶음 → 사이트별 저장 (한 번만)
   migrateLegacyStorage(chrome.storage.local, () => crypto.randomUUID()).catch((e) =>
     console.error("[uni-assist] 추출 규칙 옮기기 실패:", e.message)
@@ -52,9 +64,11 @@ chrome.runtime.onStartup.addListener(() => syncHotkeyRegistration());
 // 슬랙 토큰이 storage.local 에 있으므로 콘텐츠 스크립트는 local 을 읽지 못하게 한다(콘텐츠 스크립트는 local 을 쓰지 않는다).
 chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }).catch(() => {});
 
-// 슬랙 연결·자동 입력 설정이 바뀌면 포털 자동 입력 등록을 맞춘다
+// 슬랙 연결·자동 입력 설정이 바뀌면 포털·claude.ai 자동 입력 등록을 맞춘다
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes[K_SLACK]) syncAutoFillRegistration();
+  if (area !== "local") return;
+  if (changes[K_SLACK]) syncAutoFillRegistration();
+  if (changes[K_SLACK] || changes[K_CLAUDE]) syncClaudeAutoRegistration();
 });
 
 // ---- 텍스트 추출 복사 (페이지 내 단축키, 기본 Ctrl+Shift+Y) ------------------
@@ -426,6 +440,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 인증번호를 다루므로 웹페이지에 주입된 스크립트에서는 호출할 수 없게 한다.
     if (!isExtensionPage(sender, chrome.runtime.id)) return;
     approvalAction().then(sendResponse);
+    return true;
+  }
+  const claudeAction = {
+    CLAUDE_STATUS: claudeStatus,
+    CLAUDE_FETCH_CODE: () => fetchClaudeCode(msg.oldest),
+    CLAUDE_FILL_CODE: () => fillClaudeCodeInActiveTab(msg.code),
+    CLAUDE_SET_AUTOFILL: () => setClaudeAutoFill(msg.on),
+    CLAUDE_DIAGNOSE: diagnoseClaude,
+    CLAUDE_RESET_USED: resetClaudeUsed,
+  }[msg.type];
+  if (claudeAction) {
+    // 인증 코드를 다루므로 확장 페이지(사이드 패널)에서만 받는다
+    if (!isExtensionPage(sender, chrome.runtime.id)) return;
+    claudeAction().then(sendResponse);
+    return true;
+  }
+  if (msg.type === "CLAUDE_AUTO_FETCH") {
+    // claude.ai 자동 입력 스크립트 — 자동 입력이 켜져 있고 claude.ai 최상위 프레임일 때만 응답한다
+    isClaudeAutoSender(sender).then((allowed) =>
+      allowed ? fetchClaudeCode(msg.oldest, sender.tab).then(sendResponse) : sendResponse({ ok: false, code: "BAD_REQUEST" })
+    );
     return true;
   }
   const autoAction = {

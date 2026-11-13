@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const suites = ["test-transform.mjs", "test-login.mjs", "test-vault.mjs", "test-hotkey.mjs", "test-approval-flow.mjs", "test-slack-otp.mjs", "test-backup.mjs", "test-nav-order.mjs", "test-site-rules.mjs", "test-totp.mjs", "test-otp-store.mjs"];
+const suites = ["test-transform.mjs", "test-login.mjs", "test-vault.mjs", "test-hotkey.mjs", "test-approval-flow.mjs", "test-slack-otp.mjs", "test-backup.mjs", "test-nav-order.mjs", "test-site-rules.mjs", "test-totp.mjs", "test-otp-store.mjs", "test-claude-login.mjs"];
 
 let failed = 0;
 for (const s of suites) {

@@ -9,6 +9,7 @@
 | 🔐 자동 로그인 | 사이트별 ID/PW 등록 → 단축키(기본 `F2`) 한 번으로 **로그인, 로그인 상태면 로그아웃**. AES-256-GCM 암호화 + PC 간 동기화 |
 | ⏱ OTP 인증기 | Google OTP 대신 **웹에서 TOTP 코드 확인·복사**. 화면 QR 스캔, Google OTP 내보내기 가져오기, 이 PC 에만 암호화 저장 |
 | ✉ 유니클라우드 2차 인증 | 슬랙 DM 으로 온 **2차 인증번호를 가져와** 복사하거나 현재 탭에 입력, 켜면 포털 화면에 자동 입력 |
+| ✳ Claude 로그인 인증 | 슬랙 DM 으로 온 **Claude 보안 링크를 열어 로그인**하고 로그인 화면을 새로고침. 켜면 claude.ai 인증 화면에서 자동으로 |
 | ⚙ 설정 | 마스터 비밀번호·자동 잠금(자동 로그인 / OTP 따로), 동기화 상태, 백업, 단축키 |
 
 패널 열기/닫기는 **`F4`** 입니다 (설정에서 변경 가능).
@@ -256,6 +257,23 @@ User Token Scopes `im:history`, `im:read`, `files:read`. 둘 다 이미 설정�
 
 사용 전 사내 보안 정책상 2차 인증 자동화가 허용되는지 확인하세요.
 
+## Claude 로그인 인증 (슬랙 DM 보안 링크)
+
+claude.ai 로그인 메일 「Claude의 보안 링크가 도착했습니다」도 같은 메일→슬랙 연동으로 본인 DM 에 올라옵니다.
+슬랙 연결은 **유니클라우드 2차 인증과 같이 씁니다**(따로 연결하지 않음). 설계: [`docs/CLAUDE-LOGIN.md`](docs/CLAUDE-LOGIN.md)
+
+claude.ai 에서 이메일을 입력한 뒤 패널 **Claude 로그인 인증 → 인증 코드 가져오기**:
+1. 아직 쓰지 않은 최근 3분 안의 메일을 찾습니다(없으면 3분 동안 3초마다 다시 확인, 다시 누르면 취소).
+2. 메일 원본에서 `https://claude.ai/magic-link#…` 링크만 꺼내 **탭으로 잠깐 엽니다**(숨긴 탭에서는 페이지가 그려지지 않음).
+3. 같은 크롬이라 링크가 **바로 로그인**시키면 탭을 닫고 원래 탭으로 돌아온 뒤 **로그인 화면 탭을 새로고침**합니다.
+   링크 페이지가 코드를 보여 주면 코드를 표시하고 **복사 / 입력 후 확인**을 쓸 수 있습니다.
+
+**claude.ai 인증 코드 화면이 뜨면 자동으로 입력**을 켜면 패널을 열지 않아도 같은 과정을 돌립니다(기본 꺼짐, `claude.ai` 에만 스크립트를 심음).
+
+보안 링크는 서비스 워커 안에서만 다루고 저장·로그하지 않습니다. 링크는 열기 전에 「사용함」으로 표시해 같은 링크를 다시 열지 않습니다.
+안 되면 **진단 → 진단 실행**: 최근 메일 파일과 단계별 기록을 보여 줍니다(링크·코드·본문은 넣지 않음).
+이미 쓴 메일을 다시 시도하려면 **사용 기록 지우기**. 셀렉터·제목 문구는 `src/lib/claude-login.js` 의 `CLAUDE_LOGIN_CONFIG`.
+
 ## 폴더 구조
 
 ```
@@ -266,18 +284,21 @@ uni-assist/
 │  ├─ background/
 │  │  ├─ service-worker.js           # 패널 열기 + 단축키(복사 / 자동 로그인) + 메시지 연결 (ES 모듈)
 │  │  ├─ approval.js                 # 유니클라우드 2차 인증 (슬랙 DM)
+│  │  ├─ claude-login.js             # Claude 로그인 인증 — 보안 링크 열기·로그인 감지 (링크는 여기서만)
 │  │  └─ otp.js                      # OTP 인증기 — 복호화·코드 계산·QR 해석은 여기서만
 │  ├─ vendor/jsqr.js                 # QR 해석 (jsQR 1.4.0, Apache-2.0 — LICENSE-jsQR.txt)
 │  ├─ content/
 │  │  ├─ picker.js + .css            # 요소 선택/추출/토스트 (텍스트 추출 + 로그인 셀렉터 선택 공용)
 │  │  ├─ autofill.js + .css          # 자동 로그인 전용: 값 주입·버튼 클릭·계정 선택 오버레이
 │  │  ├─ hotkey.js                   # 페이지 내 단축키(F2/F4) 수신 — 동적 등록
+│  │  ├─ claude-auto.js              # claude.ai 인증 코드 화면 자동 처리 — 켰을 때만 동적 등록
 │  │  └─ otp-auto.js                 # 포털 2차 인증 자동 입력 — 설정에서 켰을 때만 동적 등록
 │  ├─ sidepanel/
 │  │  ├─ sidepanel.html/.css/.js     # 메뉴 + 텍스트 추출 컨트롤러
 │  │  ├─ login.js                    # 자동 로그인 화면 컨트롤러 (독립 모듈)
 │  │  ├─ otp.js                      # OTP 인증기 화면 (코드·남은 시간만 받아 그림)
 │  │  ├─ approval.js                 # 유니클라우드 2차 인증 화면 (슬랙 연결 OAuth + 인증번호 확인)
+│  │  ├─ claude-login.js             # Claude 로그인 인증 화면 (가져오기·진단)
 │  │  ├─ backup.js                   # 설정 → 백업 내보내기/가져오기
 │  │  └─ icons.js                    # 선 아이콘 SVG 스프라이트
 │  ├─ offscreen/                     # 서비스 워커 대신 DOM 작업: 클립보드 복사(OTP 30초 뒤 지우기), QR 해석(스캔할 때만 jsQR 로드)
@@ -290,6 +311,7 @@ uni-assist/
 │     ├─ login-store.js              #   사이트·계정 저장 (chrome.storage.sync, 분할 저장)
 │     ├─ vault.js                    #   마스터 비밀번호·잠금 세션
 │     ├─ slack-otp.js                #   슬랙 DM 조회·인증번호 추출·OAuth
+│     ├─ claude-login.js             #   Claude 보안 링크 메일 해석(MIME·JSON)·링크/코드 검사
 │     ├─ slack-app.js                #   슬랙 앱 정보(Client ID/Secret) — storage.sync
 │     ├─ totp.js                     #   TOTP 계산·Base32·otpauth / Google 내보내기 해석
 │     ├─ otp-store.js                #   OTP 저장소 — 봉투 암호화(DEK)·잠금 세션 (storage.local)

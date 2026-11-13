@@ -13,7 +13,7 @@ const AUTO_SCRIPT_ID = "ua-otp-auto";
 
 const failure = (err) => ({ ok: false, code: err.code || "ERROR", message: messageForError(err) });
 
-async function getSlack() {
+export async function getSlack() {
   const { [K_SLACK]: s } = await chrome.storage.local.get(K_SLACK);
   return { token: "", channelId: "", user: "", team: "", lastUsedTs: "0", autoFill: false, ...(s || {}) };
 }

@@ -21,6 +21,7 @@
       <button class="nav-btn" data-view="login"><svg class="ic" aria-hidden="true"><use href="#i-login"/></svg><span>자동 로그인</span></button>
       <button class="nav-btn" data-view="otp" title="OTP 인증기"><svg class="ic" aria-hidden="true"><use href="#i-otp"/></svg><span>OTP 인증기</span></button>
       <button class="nav-btn" data-view="approval" title="유니클라우드 2차 인증"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span>유니클라우드<br />2차 인증</span></button>
+      <button class="nav-btn" data-view="claude" title="Claude 로그인 인증"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg><span>Claude<br />로그인 인증</span></button>
       <button class="nav-btn" data-view="settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span>설정</span></button>
     </nav>
 
@@ -321,10 +322,57 @@
         </section>
       </div>
 
+      <!-- ================= Claude 로그인 인증 (슬랙 DM 의 보안 링크) ================= -->
+      <div class="view hidden" id="view-claude">
+        <section class="feature-head">
+          <h2><span class="eyebrow">05 / CLAUDE</span>Claude 로그인 인증</h2>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>인증 코드</h2>
+            <button id="btn-claude-fetch" class="btn btn-primary btn-sm">인증 코드 가져오기</button>
+          </div>
+          <p class="muted hint-text">claude.ai 에서 이메일을 입력한 뒤 누르세요. 슬랙 DM 의 보안 링크 메일을 찾아, 링크를 보이지 않는 탭으로 열어 코드를 읽고 탭을 닫습니다.</p>
+          <p class="otp-code hidden" id="claude-code"></p>
+          <p class="muted hint-text hidden" id="claude-info"></p>
+          <div class="result-actions hidden" id="claude-actions">
+            <button id="btn-claude-copy" class="btn btn-ghost btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><span>복사</span></button>
+            <button id="btn-claude-fill" class="btn btn-primary btn-sm" title="현재 탭(claude.ai)의 인증 코드 칸에 입력하고 「이메일 주소 확인」을 누릅니다">입력 후 확인</button>
+          </div>
+          <p class="hint-text hidden" id="claude-result"></p>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-slack"/></svg>슬랙 연결</h2>
+            <span class="kbd" id="claude-slack-status">…</span>
+          </div>
+          <p class="muted hint-text">「유니클라우드 2차 인증」의 슬랙 연결을 같이 씁니다.</p>
+          <label class="chk chk-block">
+            <input type="checkbox" id="claude-autofill" />
+            <span>claude.ai 인증 코드 화면이 뜨면 자동으로 입력<br /><span class="muted">패널을 열지 않아도 메일을 기다렸다 코드를 넣고 「이메일 주소 확인」을 누릅니다</span></span>
+          </label>
+          <div class="result-actions">
+            <button id="btn-claude-goto-slack" class="btn btn-ghost btn-sm hidden">슬랙 연결하러 가기</button>
+          </div>
+          <details class="token-box" id="claude-diag">
+            <summary>진단</summary>
+            <p class="muted hint-text">최근 30분 슬랙 DM 의 메일 파일과 마지막 시도가 어디서 멈췄는지 보여 줍니다. 링크·코드·본문은 넣지 않습니다(길이·개수만).</p>
+            <div class="result-actions">
+              <button id="btn-claude-reset" class="btn btn-ghost btn-sm" title="이미 쓴 메일도 다시 보도록 합니다">사용 기록 지우기</button>
+              <button id="btn-claude-diag-copy" class="btn btn-ghost btn-sm hidden"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg><span>복사</span></button>
+              <button id="btn-claude-diag" class="btn btn-primary btn-sm">진단 실행</button>
+            </div>
+            <pre class="hint-text hidden" id="claude-diag-out" style="white-space:pre-wrap;word-break:break-all;max-height:320px;overflow:auto"></pre>
+          </details>
+        </section>
+      </div>
+
       <!-- ================= 설정 ================= -->
       <div class="view hidden" id="view-settings">
         <section class="feature-head">
-          <h2><span class="eyebrow">05 / SYSTEM</span>설정</h2>
+          <h2><span class="eyebrow">06 / SYSTEM</span>설정</h2>
         </section>
         <!-- 보안 -->
         <section class="card" id="security-card">

@@ -5,6 +5,7 @@ import { applyTransforms, combineResults } from "../lib/transform.js";
 import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
 import { initLoginUI, onViewShown } from "./login.js";
 import { initApprovalUI, onApprovalShown } from "./approval.js";
+import { initClaudeUI, onClaudeShown } from "./claude-login.js";
 import { initBackupUI } from "./backup.js";
 import { initOtpUI, onOtpShown } from "./otp.js";
 import { DEFAULT_COPY_COMBO, DEFAULT_PANEL_COMBO, comboFromEvent, isTypingTarget, needsTypingGuard, normalizeHotkey } from "../lib/hotkey.js";
@@ -578,8 +579,9 @@ function toast(msg) {
 })();
 
 // ---- 메뉴(뷰) 전환 -------------------------------------------------------
-const VIEWS = ["extract", "login", "otp", "approval", "settings"];
+const VIEWS = ["extract", "login", "otp", "approval", "claude", "settings"];
 initApprovalUI();
+initClaudeUI({ showView: (v) => showView(v) });
 initBackupUI({ toast });
 initOtpUI({ showView: (v) => showView(v), toast });
 
@@ -589,6 +591,7 @@ function showView(name) {
   onViewShown(name); // 자동 로그인/설정 화면은 열릴 때마다 최신 상태로
   onOtpShown(name);
   if (name === "approval") onApprovalShown();
+  if (name === "claude") onClaudeShown();
 }
 
 $("#nav").addEventListener("click", (e) => {

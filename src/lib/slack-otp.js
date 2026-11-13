@@ -147,21 +147,40 @@ export function createSlackClient(token, fetchFn = fetch) {
       }
       throw new ApprovalError("SLACK_DM_NOT_FOUND");
     },
-    async codeFromFile(file, codeRe) {
-      // 1) history 응답의 미리보기 → 2) files.info → 3) 원본 다운로드
-      let code = findCode([file.plain_text, file.preview_plain_text, file.preview, file.simplified_html], codeRe);
-      if (code) return code;
-      const info = (await call("files.info", { file: file.id })).file || {};
-      code = findCode([info.plain_text, info.preview_plain_text, info.preview, info.simplified_html], codeRe);
-      if (code) return code;
-      const url = info.url_private_download || info.url_private;
+    /** 메일 파일 원본(다운로드)을 글자로. 받을 주소가 없으면 null */
+    async download(url) {
       if (!url) return null;
       try {
         const res = await fetchFn(url, { headers: { Authorization: `Bearer ${token}` } });
-        return findCode([await res.text()], codeRe);
+        return await res.text();
       } catch {
         throw new ApprovalError("SLACK_NETWORK");
       }
+    },
+    /**
+     * 메일 파일의 모든 본문 후보를 이름과 함께 돌려준다 (files.info + 원본 다운로드).
+     * @returns {Promise<{info: object, sources: {name: string, text: string}[]}>}
+     */
+    async fileSources(file) {
+      const info = (await call("files.info", { file: file.id })).file || {};
+      const raw = await this.download(info.url_private_download || info.url_private);
+      const named = { raw, ...Object.fromEntries(["simplified_html", "plain_text", "preview", "preview_plain_text"].map((k) => [k, info[k] || file[k]])) };
+      return { info, sources: Object.entries(named).filter(([, v]) => typeof v === "string" && v).map(([name, text]) => ({ name, text })) };
+    },
+    /**
+     * 메일 파일에서 값을 찾는다. 미리보기 → files.info → 원본 다운로드 순으로, find(sources) 가 값을 돌려주면 멈춘다.
+     * @param {(sources: string[]) => any} find
+     */
+    async findInFile(file, find) {
+      let found = find([file.plain_text, file.preview_plain_text, file.preview, file.simplified_html]);
+      if (found) return found;
+      const info = (await call("files.info", { file: file.id })).file || {};
+      found = find([info.plain_text, info.preview_plain_text, info.preview, info.simplified_html]);
+      if (found) return found;
+      return find([await this.download(info.url_private_download || info.url_private)]);
+    },
+    async codeFromFile(file, codeRe) {
+      return this.findInFile(file, (sources) => findCode(sources, codeRe));
     },
     async revoke() {
       await call("auth.revoke");
@@ -170,20 +189,35 @@ export function createSlackClient(token, fetchFn = fetch) {
 }
 
 /**
- * DM 에서 아직 쓰지 않은 가장 최근 인증번호. 없으면 null (호출한 쪽이 기다렸다 다시 묻는다).
- * @returns {Promise<{code:string, ts:string, receivedAt:string|null} | null>}
+ * DM 에서 아직 쓰지 않은 가장 최근 메일 파일 중 find 가 값을 찾은 것. 없으면 null.
+ * @returns {Promise<{value:any, ts:string, receivedAt:string|null} | null>}
  */
-export async function fetchLatestOtp(client, { channelId, oldest, lastUsedTs, titleKeyword, codeRe }) {
+export async function fetchLatestMatch(client, { channelId, oldest, lastUsedTs, titleKeyword, find }) {
   const { messages = [] } = await client.call("conversations.history", {
     channel: channelId,
     oldest: String(oldest),
     limit: "20",
   });
   for (const { ts, file } of otpCandidates(messages, { titleKeyword, lastUsedTs })) {
-    const code = await client.codeFromFile(file, codeRe);
-    if (code) return { code, ts, receivedAt: tsToIso(ts) };
+    const value = await client.findInFile(file, find);
+    if (value) return { value, ts, receivedAt: tsToIso(ts) };
   }
   return null;
+}
+
+/**
+ * DM 에서 아직 쓰지 않은 가장 최근 인증번호. 없으면 null (호출한 쪽이 기다렸다 다시 묻는다).
+ * @returns {Promise<{code:string, ts:string, receivedAt:string|null} | null>}
+ */
+export async function fetchLatestOtp(client, { channelId, oldest, lastUsedTs, titleKeyword, codeRe }) {
+  const found = await fetchLatestMatch(client, {
+    channelId,
+    oldest,
+    lastUsedTs,
+    titleKeyword,
+    find: (sources) => findCode(sources, codeRe),
+  });
+  return found && { code: found.value, ts: found.ts, receivedAt: found.receivedAt };
 }
 
 /** OAuth code → 사용자 토큰 */
