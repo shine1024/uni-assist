@@ -330,10 +330,10 @@
 
         <section class="card">
           <div class="card-head">
-            <h2><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>인증 코드</h2>
-            <button id="btn-claude-fetch" class="btn btn-primary btn-sm">인증 코드 가져오기</button>
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>로그인</h2>
+            <button id="btn-claude-fetch" class="btn btn-primary btn-sm">보안 링크로 로그인</button>
           </div>
-          <p class="muted hint-text">claude.ai 에서 이메일을 입력한 뒤 누르세요. 슬랙 DM 의 보안 링크 메일을 찾아, 링크를 보이지 않는 탭으로 열어 코드를 읽고 탭을 닫습니다.</p>
+          <p class="muted hint-text">claude.ai 에서 이메일을 입력한 뒤 누르세요. 슬랙 DM 의 보안 링크 메일을 찾아 링크를 잠깐 열어 로그인하고, 로그인 화면을 새로고침합니다. 링크가 코드를 보여 주면 코드를 표시합니다.</p>
           <p class="otp-code hidden" id="claude-code"></p>
           <p class="muted hint-text hidden" id="claude-info"></p>
           <div class="result-actions hidden" id="claude-actions">
@@ -351,7 +351,7 @@
           <p class="muted hint-text">「유니클라우드 2차 인증」의 슬랙 연결을 같이 씁니다.</p>
           <label class="chk chk-block">
             <input type="checkbox" id="claude-autofill" />
-            <span>claude.ai 인증 코드 화면이 뜨면 자동으로 입력<br /><span class="muted">패널을 열지 않아도 메일을 기다렸다 코드를 넣고 「이메일 주소 확인」을 누릅니다</span></span>
+            <span>claude.ai 인증 화면이 뜨면 자동으로 로그인<br /><span class="muted">패널을 열지 않아도 메일을 기다렸다 보안 링크로 로그인합니다</span></span>
           </label>
           <div class="result-actions">
             <button id="btn-claude-goto-slack" class="btn btn-ghost btn-sm hidden">슬랙 연결하러 가기</button>

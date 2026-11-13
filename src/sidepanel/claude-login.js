@@ -115,7 +115,7 @@ async function fetchCode() {
   } finally {
     stopTicker();
     waiting = null;
-    button.textContent = "인증 코드 가져오기";
+    button.textContent = "보안 링크로 로그인";
   }
 }
 
@@ -181,7 +181,7 @@ async function copyDiagnosis() {
 
 async function resetUsed() {
   await chrome.runtime.sendMessage({ type: "CLAUDE_RESET_USED" }).catch(() => null);
-  setInfo("사용 기록을 지웠어요. 「인증 코드 가져오기」를 다시 누르세요");
+  setInfo("사용 기록을 지웠어요. 「보안 링크로 로그인」을 다시 누르세요");
 }
 
 export function initClaudeUI({ showView }) {
