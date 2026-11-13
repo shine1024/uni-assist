@@ -6,6 +6,7 @@
 import { icon } from "./icons.js";
 import { encryptSecret } from "../lib/crypto.js";
 import {
+  DEFAULT_COPY_COMBO,
   DEFAULT_PANEL_COMBO,
   comboFromEvent,
   displayCombo,
@@ -531,21 +532,10 @@ async function renderSettings(st) {
 
   const shortcutHint = $("#login-shortcut-hint");
   if (shortcutHint) {
-    try {
-      const cmds = await chrome.commands.getAll();
-      const c = cmds.find((x) => x.name === "auto-login");
-      const hk = normalizeHotkey((await store.getSettings()).hotkey);
-      const keys = [];
-      if (hk.enabled) keys.push(displayCombo(hk.combo, IS_MAC));
-      if (c && c.shortcut) keys.push(c.shortcut);
-      shortcutHint.innerHTML = keys.length
-        ? `등록한 사이트에서 ${keys
-            .map((k) => `<span class="kbd">${esc(k)}</span>`)
-            .join(" 또는 ")} → <b>로그인</b>, 이미 로그인된 상태면 <b>로그아웃</b>합니다.`
-        : "단축키가 등록되지 않았어요 — <b>설정 → 단축키</b>에서 지정하세요.";
-    } catch (_) {
-      shortcutHint.textContent = "";
-    }
+    const hk = normalizeHotkey((await store.getSettings()).hotkey);
+    shortcutHint.innerHTML = hk.enabled
+      ? `등록한 사이트에서 <span class="kbd">${esc(displayCombo(hk.combo, IS_MAC))}</span> → <b>로그인</b>, 이미 로그인된 상태면 <b>로그아웃</b>합니다.`
+      : "단축키가 꺼져 있어요 — <b>설정 → 단축키</b>에서 켜세요.";
   }
 
   await renderPageHotkey();
@@ -559,9 +549,9 @@ async function renderSettings(st) {
     : sync.message;
 }
 
-// ---- 페이지 내 단축키 (F2 등) --------------------------------------------
-// Chrome commands API 는 Ctrl/Alt 를 반드시 포함해야 하고 F1~F12 를 지원하지 않는다.
-// 그래서 등록된 사이트의 페이지에 콘텐츠 스크립트를 심어 키를 직접 받는다(서비스 워커가 등록).
+// ---- 페이지 내 단축키 (F2 / F4 / Ctrl+Shift+Y) ----------------------------
+// Chrome commands API 는 Ctrl/Alt 를 반드시 포함해야 하고 F1~F12 를 지원하지 않으며, 키를 바꾸려면
+// chrome://extensions/shortcuts 로 가야 한다. 그래서 모든 단축키를 페이지에 심은 콘텐츠 스크립트로 받는다.
 const IS_MAC = /Mac/i.test(navigator.platform || navigator.userAgent || "");
 
 const HK = {
@@ -581,16 +571,24 @@ const HK = {
     chk: "#panel-hotkey-enabled",
     label: "패널 열기/닫기",
   },
+  copy: {
+    key: "copyHotkey",
+    fallback: DEFAULT_COPY_COMBO,
+    keyEl: "#copy-hotkey",
+    btn: "#btn-capture-copy-hotkey",
+    chk: "#copy-hotkey-enabled",
+    label: "추출 결과 복사",
+  },
 };
+const HK_KINDS = Object.keys(HK);
+// 같은 키가 겹치면 hotkey.js 의 판단 순서(패널 → 로그인 → 복사)대로 앞쪽이 동작한다
 
 async function renderPageHotkey() {
   const st = await store.getSettings();
-  const vals = {
-    auth: normalizeHotkey(st.hotkey, HK.auth.fallback),
-    panel: normalizeHotkey(st.panelHotkey, HK.panel.fallback),
-  };
+  const vals = {};
+  for (const kind of HK_KINDS) vals[kind] = normalizeHotkey(st[HK[kind].key], HK[kind].fallback);
 
-  for (const kind of ["auth", "panel"]) {
+  for (const kind of HK_KINDS) {
     const cfg = HK[kind];
     const hk = vals[kind];
     const keyEl = $(cfg.keyEl);
@@ -610,26 +608,34 @@ async function renderPageHotkey() {
   const count = toMatchPatterns(all).length;
 
   const notes = [];
-  if (!vals.auth.enabled && !vals.panel.enabled) {
-    notes.push("둘 다 꺼져 있어 페이지 내 단축키가 동작하지 않습니다.");
+  if (HK_KINDS.every((k) => !vals[k].enabled)) {
+    notes.push("모두 꺼져 있어 단축키가 동작하지 않습니다.");
   } else if (allSites) {
     notes.push("모든 http(s) 페이지에서 동작합니다.");
   } else if (count) {
-    notes.push(`등록된 <b>${count}개</b> 사이트의 페이지에서만 동작합니다.`);
+    notes.push(`로그인 등록 <b>${count}개</b> 사이트와 추출 규칙이 있는 사이트에서만 동작합니다.`);
   } else {
     notes.push(
-      "사이트를 등록하거나 <b>모든 사이트에서 사용</b>을 켜야 동작합니다. (현재 대상 사이트 0개)"
+      "로그인 등록 사이트·추출 규칙이 있는 사이트에서만 동작합니다. (현재 로그인 등록 사이트 0개)"
     );
   }
   notes.push("페이지에 포커스가 있어야 하며, 주소창에 포커스가 있으면 동작하지 않습니다.");
-  if (vals.auth.enabled && needsTypingGuard(vals.auth.combo)) {
-    notes.push(
-      `<b>${esc(displayCombo(vals.auth.combo, IS_MAC))}</b> 는 수정자가 없는 일반 키라서 입력창에 포커스가 있을 때는 무시합니다.`
-    );
+  for (const kind of HK_KINDS) {
+    if (vals[kind].enabled && needsTypingGuard(vals[kind].combo)) {
+      notes.push(
+        `<b>${esc(displayCombo(vals[kind].combo, IS_MAC))}</b> 는 수정자가 없는 일반 키라서 입력창에 포커스가 있을 때는 무시합니다.`
+      );
+    }
   }
-  if (hotkeyConflict(vals.auth, vals.panel)) {
-    notes.push('<span class="err-text">두 단축키가 같습니다 — 패널 토글이 우선 동작합니다.</span>');
-  }
+  HK_KINDS.forEach((a, i) =>
+    HK_KINDS.slice(i + 1).forEach((b) => {
+      if (hotkeyConflict(vals[a], vals[b])) {
+        notes.push(
+          `<span class="err-text">${HK[a].label}·${HK[b].label} 단축키가 같습니다 — ${HK[a].label}이(가) 우선 동작합니다.</span>`
+        );
+      }
+    })
+  );
   notes.push("페이지가 같은 키를 쓰면 충돌할 수 있습니다. 그때는 다른 키로 바꾸세요.");
   $("#page-hotkey-note").innerHTML = notes.join(" ");
 }
@@ -880,6 +886,8 @@ function bindStaticEvents() {
   $("#panel-hotkey-enabled").addEventListener("change", (e) =>
     toggleHotkeyEnabled("panel", e.target.checked)
   );
+  $("#btn-capture-copy-hotkey").addEventListener("click", () => startCapture("copy"));
+  $("#copy-hotkey-enabled").addEventListener("change", (e) => toggleHotkeyEnabled("copy", e.target.checked));
 
   $("#hotkey-all-sites").addEventListener("change", async (e) => {
     await store.setSettings({ hotkeyAllSites: e.target.checked });

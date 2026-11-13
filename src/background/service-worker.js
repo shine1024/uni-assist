@@ -1,11 +1,11 @@
 // 백그라운드 서비스 워커 (ES 모듈)
 // 역할:
 //  1) 툴바 아이콘 클릭 → 사이드 패널 열기
-//  2) 단축키(commands) → 허용 사이트에서만 조합 결과를 추출·복사
+//  2) 페이지 내 복사 단축키(기본 Ctrl+Shift+Y) → 추출 규칙이 있는 사이트에서만 조합 결과를 추출·복사
 //  3) 단축키 → 등록된 사이트에서 자동 로그인 / 로그인 상태면 로그아웃
 //  4) 단축키 → 사이드 패널 열기·닫기 (페이지 내 단축키, 기본 F4)
 import { applyTransforms, combineResults } from "../lib/transform.js";
-import { urlMatches } from "../lib/match.js";
+import { K_SITE_RULES, migrateLegacyStorage, normalizeSiteState, siteKeyFromUrl } from "../lib/site-rules.js";
 import { decryptString, secretMatchesKey } from "../lib/crypto.js";
 import {
   accountCandidates,
@@ -31,8 +31,6 @@ import {
   syncAutoFillRegistration,
 } from "./approval.js";
 
-const CMD = "copy-combined";
-const CMD_LOGIN = "auto-login";
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel
@@ -42,6 +40,10 @@ chrome.runtime.onInstalled.addListener(() => {
   // 설치·업데이트·다시 불러오기 직후에도 이미 열린 탭에서 F2/F4 가 바로 되도록 직접 심는다.
   syncHotkeyRegistration().then(injectHotkeyIntoOpenTabs);
   syncAutoFillRegistration();
+  // 텍스트 추출 규칙: 예전 단일 묶음 → 사이트별 저장 (한 번만)
+  migrateLegacyStorage(chrome.storage.local, () => crypto.randomUUID()).catch((e) =>
+    console.error("[uni-assist] 추출 규칙 옮기기 실패:", e.message)
+  );
 });
 
 chrome.runtime.onStartup.addListener(() => syncHotkeyRegistration());
@@ -54,31 +56,27 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes[K_SLACK]) syncAutoFillRegistration();
 });
 
-// ---- 단축키 처리 ---------------------------------------------------------
-chrome.commands.onCommand.addListener((command) => {
-  if (command === CMD) runCopyCombined();
-  else if (command === CMD_LOGIN) runAutoLogin();
-});
+// ---- 텍스트 추출 복사 (페이지 내 단축키, 기본 Ctrl+Shift+Y) ------------------
+// 예전에는 chrome.commands 로 등록했지만 키를 패널에서 바꿀 수 없어 F2/F4 와 같은 방식으로 옮겼다.
+async function siteHasRules(url) {
+  const key = siteKeyFromUrl(url);
+  if (!key) return false;
+  const { [K_SITE_RULES]: all } = await chrome.storage.local.get(K_SITE_RULES);
+  return normalizeSiteState(all && all[key]).rules.length > 0;
+}
 
-async function runCopyCombined() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+async function runCopyCombined(tab) {
   if (!tab || !tab.id) return;
   const url = tab.url || "";
 
   if (!/^(https?|file):/.test(url)) return; // 주입 불가 페이지
 
-  const { allowedPatterns = [], current } = await chrome.storage.local.get([
-    "allowedPatterns",
-    "current",
-  ]);
-
-  // 핵심: 허용된 사이트에서만 동작
-  if (!urlMatches(url, allowedPatterns)) return;
-
-  const state = current && Array.isArray(current.rules) ? current : null;
-  if (!state || state.rules.length === 0) {
-    return flashBadge(tab.id, "✗", "#f43f5e");
-  }
+  // 규칙은 사이트별로 저장된다 — 이 사이트에 규칙이 없으면 아무것도 하지 않는다(키를 그대로 둔다)
+  const key = siteKeyFromUrl(url);
+  await migrateLegacyStorage(chrome.storage.local, () => crypto.randomUUID());
+  const { [K_SITE_RULES]: all } = await chrome.storage.local.get(K_SITE_RULES);
+  const state = normalizeSiteState(all && all[key]);
+  if (!key || state.rules.length === 0) return;
 
   try {
     await ensurePicker(tab.id);
@@ -457,6 +455,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     return; // 응답 불필요
   }
+  if (msg.type === "COPY_HOTKEY") {
+    // 페이지에서 눌린 복사 단축키 — 보낸 탭에서 다시 읽어 복사한다 (규칙이 없으면 아무것도 안 함)
+    runCopyCombined(sender && sender.tab);
+    return;
+  }
+  if (msg.type === "COPY_HOTKEY_TARGET") {
+    const url = (sender && (sender.url || (sender.tab && sender.tab.url))) || "";
+    siteHasRules(url)
+      .then((target) => sendResponse({ target }))
+      .catch(() => sendResponse({ target: false }));
+    return true;
+  }
   if (msg.type === "LOGIN_HOTKEY") {
     // 페이지에서 눌린 단축키 — 활성 탭 추측 대신 **보낸 탭**을 그대로 쓴다
     const tabId = sender && sender.tab && sender.tab.id;
@@ -503,7 +513,7 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 // ==========================================================================
-// 페이지 내 단축키 (F2 / F4) — commands API 로 등록할 수 없는 키를 지원
+// 페이지 내 단축키 (F2 / F4 / Ctrl+Shift+Y) — commands API 대신 페이지에서 직접 받는다
 //
 // Chrome `commands` 는 Ctrl/Alt 를 반드시 포함해야 하고 F1~F12 를 지원하지 않는다(공식 문서).
 // 그래서 등록된 사이트에만 `src/content/hotkey.js` 를 동적으로 심어 키를 직접 받는다.
@@ -530,10 +540,16 @@ async function syncHotkeyRegistration() {
     const [sites, settings] = await Promise.all([loadSites(), getSettings()]);
     const authOn = settings.hotkey && settings.hotkey.enabled !== false;
     const panelOn = settings.panelHotkey && settings.panelHotkey.enabled !== false;
-    if (authOn || panelOn) {
+    const copyOn = settings.copyHotkey && settings.copyHotkey.enabled !== false;
+    if (authOn || panelOn || copyOn) {
       // 패널 토글(F4)은 어디서든 쓰고 싶은 기능이라 기본은 모든 http(s) 페이지.
-      // 끄면 등록된 로그인 사이트에만 리스너를 심는다(범위 최소화).
-      patterns = settings.hotkeyAllSites === false ? toMatchPatterns(sites) : ALL_SITES_MATCHES;
+      // 끄면 등록된 로그인 사이트 + 텍스트 추출 규칙이 있는 사이트에만 리스너를 심는다(범위 최소화).
+      if (settings.hotkeyAllSites === false) {
+        const { [K_SITE_RULES]: rules } = await chrome.storage.local.get(K_SITE_RULES);
+        patterns = [...new Set([...toMatchPatterns(sites), ...siteRulePatterns(rules)])];
+      } else {
+        patterns = ALL_SITES_MATCHES;
+      }
     }
   } catch (e) {
     console.error("[uni-assist] 단축키 등록 정보 로드 실패:", e.message);
@@ -586,8 +602,29 @@ async function injectHotkeyIntoOpenTabs() {
   );
 }
 
+/** 텍스트 추출 규칙이 있는 사이트 → 매치 패턴 (포트는 빼서 모든 포트에 일치시킨다) */
+function siteRulePatterns(all) {
+  const out = [];
+  for (const [key, st] of Object.entries(all || {})) {
+    if (!normalizeSiteState(st).rules.length) continue;
+    if (key === "file") out.push("file:///*");
+    else {
+      const host = key.replace(/:\d+$/, "");
+      out.push(`http://${host}/*`, `https://${host}/*`);
+    }
+  }
+  return out;
+}
+
 // 사이트/설정이 바뀌면(이 PC에서든 동기화로든) 등록을 갱신
 chrome.storage.onChanged.addListener((changes, area) => {
+  // 「모든 사이트에서 사용」을 끈 경우에는 추출 규칙이 있는 사이트도 대상이라 규칙이 바뀌면 다시 등록한다
+  if (area === "local" && changes[K_SITE_RULES]) {
+    getSettings()
+      .then((s) => s.hotkeyAllSites === false && syncHotkeyRegistration())
+      .catch(() => {});
+    return;
+  }
   if (area !== "sync") return;
   const touched = Object.keys(changes).some(
     (k) => k.startsWith("ua_site_") || k === "ua_login_index" || k === "ua_login_settings"

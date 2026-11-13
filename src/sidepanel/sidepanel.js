@@ -2,21 +2,28 @@
 // 자동 로그인 화면은 독립 모듈 `login.js` 가 담당한다.
 import { icon } from "./icons.js";
 import { applyTransforms, combineResults } from "../lib/transform.js";
-import { parsePatterns } from "../lib/match.js";
 import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
 import { initLoginUI, onViewShown } from "./login.js";
 import { initApprovalUI, onApprovalShown } from "./approval.js";
 import { initBackupUI } from "./backup.js";
-import { DEFAULT_PANEL_COMBO, comboFromEvent, isTypingTarget, needsTypingGuard, normalizeHotkey } from "../lib/hotkey.js";
+import { DEFAULT_COPY_COMBO, DEFAULT_PANEL_COMBO, comboFromEvent, isTypingTarget, needsTypingGuard, normalizeHotkey } from "../lib/hotkey.js";
 import { K_SETTINGS } from "../lib/login-store.js";
-
-const DEFAULT_PATTERNS = ["https://labdev.unipost.co.kr/redmine"];
+import { K_NAV_ORDER, moveItem, normalizeOrder } from "../lib/nav-order.js";
+import {
+  DEFAULT_COMBINE,
+  K_SITE_RULES,
+  migrateLegacyStorage,
+  normalizeSiteState,
+  putSiteState,
+  siteKeyFromUrl,
+} from "../lib/site-rules.js";
 
 // ---- 상태 ----------------------------------------------------------------
-const DEFAULT_COMBINE = { mode: "join", separator: "space", customSep: "", template: "" };
-
-let state = { rules: [], combine: { ...DEFAULT_COMBINE } };
+// 규칙은 사이트별로 저장된다(../lib/site-rules.js). `state` 는 현재 탭 사이트의 묶음이다.
+let siteKey = null; // 현재 탭의 사이트 (규칙을 쓸 수 없는 페이지면 null)
+let state = normalizeSiteState(null);
 let pickingRuleId = null; // 현재 요소 선택 대기 중인 규칙(영속 X)
+const advOpen = new Set(); // 「고급 설정」을 펼쳐 둔 규칙 (다시 그려도 유지)
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const rulesEl = $("#rules");
@@ -58,19 +65,30 @@ function defaultName(r) {
 
 // ---- 저장/불러오기 -------------------------------------------------------
 let saveTimer = null;
-function saveStateDebounced() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => chrome.storage.local.set({ current: state }), 250);
+let pendingSave = null; // { key, state } — 사이트를 바꾸기 전에 마저 저장한다
+
+async function writeSiteState(key, st) {
+  const { [K_SITE_RULES]: all } = await chrome.storage.local.get(K_SITE_RULES);
+  await chrome.storage.local.set({ [K_SITE_RULES]: putSiteState(all, key, st) });
 }
 
-async function loadState() {
-  const { current } = await chrome.storage.local.get("current");
-  if (current && Array.isArray(current.rules)) {
-    state = {
-      rules: current.rules,
-      combine: { ...DEFAULT_COMBINE, ...(current.combine || {}) },
-    };
-  }
+function saveStateDebounced() {
+  if (!siteKey) return;
+  pendingSave = { key: siteKey, state };
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, 250);
+}
+
+async function flushSave() {
+  clearTimeout(saveTimer);
+  const p = pendingSave;
+  pendingSave = null;
+  if (p) await writeSiteState(p.key, p.state);
+}
+
+async function loadState(key) {
+  const { [K_SITE_RULES]: all } = await chrome.storage.local.get(K_SITE_RULES);
+  state = normalizeSiteState(key && all ? all[key] : null);
 }
 
 // ---- 계산/렌더 -----------------------------------------------------------
@@ -88,10 +106,22 @@ function recompute() {
     if (!el) return;
     const c = computed[i];
     el.classList.toggle("error", !!c.error);
-    el.textContent = c.error ? c.error : c.result === "" ? "(빈 값)" : c.result;
+    el.textContent = c.error
+      ? c.error
+      : r.missing
+        ? "이 페이지에서 요소를 찾지 못했어요"
+        : c.result === ""
+          ? "(빈 값)"
+          : c.result;
   });
   resultEl.value = combineResults(computed, state.combine);
   saveStateDebounced();
+}
+
+// 기본으로는 이름·결과만 보이고, 추출 대상·변환 등은 「고급 설정」 안에 둔다
+function hasAdvanced(r) {
+  const xf = (r.transforms || []).some((x) => x.find);
+  return xf || (r.source && r.source !== "innerText") || r.trim === false || r.enabled === false;
 }
 
 function ruleCardHTML(r, num) {
@@ -113,47 +143,65 @@ function ruleCardHTML(r, num) {
   <div class="rule ${r.enabled ? "" : "disabled"} ${pickingRuleId === r.id ? "picking" : ""}" data-rule-id="${r.id}">
     <div class="rule-top">
       <span class="rule-num">${num}</span>
-      <input class="rule-name" data-field="name" placeholder="규칙 이름" value="${escAttr(r.name)}" />
+      <input class="rule-name" data-field="name" placeholder="이름" value="${escAttr(r.name)}" />
       <div class="rule-tools">
+        <button class="btn btn-icon" data-action="reselect" title="요소 다시 선택">${icon("target")}</button>
         <button class="btn btn-icon" data-action="up" title="위로">${icon("up")}</button>
         <button class="btn btn-icon" data-action="down" title="아래로">${icon("down")}</button>
-        <button class="btn btn-icon btn-danger" data-action="delete" title="규칙 삭제">${icon("trash")}</button>
+        <button class="btn btn-icon btn-danger" data-action="delete" title="삭제">${icon("trash")}</button>
       </div>
     </div>
 
-    <div class="rule-selector">
-      <code class="${r.missing ? "missing" : ""}" data-selector>${escAttr(r.selector || "(선택 안 됨)")}</code>
-      <button class="btn btn-sm" data-action="reselect" title="요소 다시 선택">다시 선택</button>
-      <button class="btn btn-sm btn-icon" data-action="refresh" title="이 페이지에서 재추출">${icon("refresh")}</button>
-    </div>
+    <div class="rule-result ${r.missing ? "missing" : ""}" data-result="${r.id}"></div>
 
-    <div class="rule-source">
-      <select data-field="source">
-        <option value="innerText" ${r.source === "innerText" ? "selected" : ""}>텍스트</option>
-        <option value="textContent" ${r.source === "textContent" ? "selected" : ""}>텍스트(숨김포함)</option>
-        <option value="value" ${r.source === "value" ? "selected" : ""}>입력값</option>
-        <option value="attr" ${r.source === "attr" ? "selected" : ""}>속성</option>
-      </select>
-      <input class="attr-name ${r.source === "attr" ? "" : "hidden"}" data-field="attrName" placeholder="속성명 (예: href)" value="${escAttr(r.attrName)}" />
-    </div>
+    <details class="adv rule-adv" ${advOpen.has(r.id) ? "open" : ""}>
+      <summary>고급 설정${hasAdvanced(r) ? ' <span class="adv-on">적용 중</span>' : ""}</summary>
+      <div class="adv-body">
+        <div class="rule-selector">
+          <code class="${r.missing ? "missing" : ""}" data-selector>${escAttr(r.selector || "(선택 안 됨)")}</code>
+          <button class="btn btn-sm btn-icon" data-action="refresh" title="이 페이지에서 다시 읽기">${icon("refresh")}</button>
+        </div>
 
-    <div class="transforms">${xfRows}</div>
-    <button class="btn btn-sm btn-ghost" data-action="xf-add">+ 변환 추가</button>
+        <div class="rule-source">
+          <select data-field="source">
+            <option value="innerText" ${r.source === "innerText" ? "selected" : ""}>텍스트</option>
+            <option value="textContent" ${r.source === "textContent" ? "selected" : ""}>텍스트(숨김포함)</option>
+            <option value="value" ${r.source === "value" ? "selected" : ""}>입력값</option>
+            <option value="attr" ${r.source === "attr" ? "selected" : ""}>속성</option>
+          </select>
+          <input class="attr-name ${r.source === "attr" ? "" : "hidden"}" data-field="attrName" placeholder="속성명 (예: href)" value="${escAttr(r.attrName)}" />
+        </div>
 
-    <div class="rule-foot">
-      <label><input type="checkbox" data-field="trim" ${r.trim ? "checked" : ""}/> 앞뒤 공백 제거</label>
-      <label><input type="checkbox" data-field="enabled" ${r.enabled ? "checked" : ""}/> 조합에 포함</label>
-    </div>
+        <div class="transforms">${xfRows}</div>
+        <button class="btn btn-sm btn-ghost" data-action="xf-add">+ 찾아 바꾸기 추가</button>
 
-    <div class="rule-result" data-result="${r.id}"></div>
+        <div class="rule-foot">
+          <label><input type="checkbox" data-field="trim" ${r.trim ? "checked" : ""}/> 앞뒤 공백 제거</label>
+          <label><input type="checkbox" data-field="enabled" ${r.enabled ? "checked" : ""}/> 결과에 포함</label>
+        </div>
+      </div>
+    </details>
   </div>`;
 }
 
 function renderRules() {
   rulesEl.innerHTML = state.rules.map((r, i) => ruleCardHTML(r, i + 1)).join("");
-  emptyHint.classList.toggle("hidden", state.rules.length > 0);
+  emptyHint.classList.toggle("hidden", state.rules.length > 0 || !siteKey);
   recompute();
 }
+
+// <details> 의 toggle 은 버블링되지 않으므로 캡처 단계에서 받는다
+rulesEl.addEventListener(
+  "toggle",
+  (e) => {
+    if (!e.target.matches || !e.target.matches("details.rule-adv")) return;
+    const card = e.target.closest("[data-rule-id]");
+    if (!card) return;
+    if (e.target.open) advOpen.add(card.dataset.ruleId);
+    else advOpen.delete(card.dataset.ruleId);
+  },
+  true
+);
 
 function renderCombineControls() {
   $("#separator").value = state.combine.separator;
@@ -164,6 +212,7 @@ function renderCombineControls() {
   $("#join-opts").classList.toggle("hidden", isTpl);
   $("#template-opts").classList.toggle("hidden", !isTpl);
   $$(".seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.mode === state.combine.mode));
+  if (isTpl) $("#combine-adv").open = true; // 템플릿을 쓰는 중이면 설정을 감추지 않는다
 }
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
@@ -215,10 +264,12 @@ async function refreshRule(rule) {
   }
 }
 
-async function refreshAll() {
+async function refreshAll({ quiet = false } = {}) {
+  const key = siteKey;
   for (const r of state.rules) await refreshRule(r);
+  if (key !== siteKey) return; // 읽는 사이에 다른 사이트로 바뀜
   renderRules();
-  toast("현재 페이지에서 재추출했어요");
+  if (!quiet) toast("현재 페이지에서 다시 읽었어요");
 }
 
 // 콘텐츠 스크립트로부터의 메시지 수신
@@ -349,6 +400,10 @@ rulesEl.addEventListener("click", async (e) => {
 
 // ---- 이벤트: 헤더 / 조합 / 복사 -----------------------------------------
 $("#btn-add-rule").addEventListener("click", () => {
+  if (!siteKey) {
+    toast("이 페이지에서는 요소를 선택할 수 없어요");
+    return;
+  }
   const r = newRule();
   state.rules.push(r);
   renderRules();
@@ -377,7 +432,7 @@ $("#template").addEventListener("input", (e) => {
   recompute();
 });
 
-$("#btn-refresh").addEventListener("click", refreshAll);
+$("#btn-refresh").addEventListener("click", () => refreshAll());
 
 $("#btn-copy").addEventListener("click", async () => {
   const text = resultEl.value;
@@ -449,6 +504,7 @@ $("#preset-list").addEventListener("click", async (e) => {
   if (!p) return;
 
   if (btn.dataset.action === "load") {
+    if (!siteKey) return toast("이 페이지에서는 규칙을 쓸 수 없어요");
     state.rules = JSON.parse(JSON.stringify(p.rules));
     state.combine = { ...DEFAULT_COMBINE, ...p.combine };
     renderCombineControls();
@@ -461,41 +517,6 @@ $("#preset-list").addEventListener("click", async (e) => {
   }
 });
 
-// ---- 사이트 & 단축키 설정 -----------------------------------------------
-async function loadShortcutSettings() {
-  const { allowedPatterns } = await chrome.storage.local.get("allowedPatterns");
-  const patterns = Array.isArray(allowedPatterns) ? allowedPatterns : DEFAULT_PATTERNS;
-  $("#allowed-patterns").value = patterns.join("\n");
-  if (!Array.isArray(allowedPatterns)) {
-    chrome.storage.local.set({ allowedPatterns: DEFAULT_PATTERNS }); // 최초 기본값 저장
-  }
-  try {
-    const cmds = await chrome.commands.getAll();
-    const show = (name, el) => {
-      const c = cmds.find((x) => x.name === name);
-      $(el).textContent = c && c.shortcut ? c.shortcut : "(미설정 · 충돌 가능)";
-    };
-    show("copy-combined", "#shortcut-key");
-    show("auto-login", "#login-shortcut-key");
-  } catch (_) {
-    $("#shortcut-key").textContent = "단축키";
-    $("#login-shortcut-key").textContent = "단축키";
-  }
-}
-
-let patTimer = null;
-$("#allowed-patterns").addEventListener("input", (e) => {
-  const text = e.target.value;
-  clearTimeout(patTimer);
-  patTimer = setTimeout(() => {
-    chrome.storage.local.set({ allowedPatterns: parsePatterns(text) });
-  }, 300);
-});
-
-$("#btn-change-shortcut").addEventListener("click", () => {
-  chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
-});
-
 // ---- 토스트 --------------------------------------------------------------
 let toastTimer = null;
 function toast(msg) {
@@ -506,23 +527,31 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.add("hidden"), 1600);
 }
 
-// ---- 패널 안에서 누른 F4 로도 닫기 ---------------------------------------
+// ---- 패널에 포커스가 있을 때의 단축키 (F4 닫기, 복사) ------------------------
 // 패널에 포커스가 있으면 키 입력이 페이지로 가지 않아 콘텐츠 스크립트(hotkey.js)가 받지 못한다.
-// 패널 문서에서 같은 키를 받아 직접 닫는다. (키 지정 중에는 login.js 가 캡처 단계에서 먼저 가로챈다)
-(function closeOnPanelHotkey() {
+// 패널 문서에서 같은 키를 받아 직접 처리한다. (키 지정 중에는 login.js 가 캡처 단계에서 먼저 가로챈다)
+(function panelHotkeys() {
   let hotkey = normalizeHotkey(null, DEFAULT_PANEL_COMBO);
-  const apply = (s) => (hotkey = normalizeHotkey(s && s.panelHotkey, DEFAULT_PANEL_COMBO));
+  let copyHotkey = normalizeHotkey(null, DEFAULT_COPY_COMBO);
+  const apply = (s) => {
+    hotkey = normalizeHotkey(s && s.panelHotkey, DEFAULT_PANEL_COMBO);
+    copyHotkey = normalizeHotkey(s && s.copyHotkey, DEFAULT_COPY_COMBO);
+  };
   chrome.storage.sync.get(K_SETTINGS).then((bag) => apply(bag[K_SETTINGS]));
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes[K_SETTINGS]) apply(changes[K_SETTINGS].newValue);
   });
   window.addEventListener("keydown", (e) => {
-    if (e.repeat || !hotkey.enabled) return;
+    if (e.repeat) return;
     const combo = comboFromEvent(e);
-    if (combo !== hotkey.combo) return;
-    if (needsTypingGuard(combo) && isTypingTarget(e.target)) return;
-    e.preventDefault();
-    window.close(); // 사이드 패널 문서에서 window.close() 는 패널을 닫는다
+    if (!combo || (needsTypingGuard(combo) && isTypingTarget(e.target))) return;
+    if (hotkey.enabled && combo === hotkey.combo) {
+      e.preventDefault();
+      window.close(); // 사이드 패널 문서에서 window.close() 는 패널을 닫는다
+    } else if (copyHotkey.enabled && combo === copyHotkey.combo && state.rules.length) {
+      e.preventDefault();
+      $("#btn-copy").click(); // 패널에 보이는 결과를 그대로 복사
+    }
   });
 })();
 
@@ -564,14 +593,124 @@ $("#nav").addEventListener("click", (e) => {
   if (b) showView(b.dataset.view);
 });
 
+// ---- 메뉴 순서: 드래그로 변경 ----------------------------------------------
+// 순서는 storage.sync(`ua_nav_order`)에 저장 → 다른 PC 와 동기화, 백업에도 포함된다.
+(function navOrder() {
+  const nav = $("#nav");
+  const buttons = () => $$(".nav-btn", nav);
+  const currentOrder = () => buttons().map((b) => b.dataset.view);
+
+  function apply(order) {
+    const byView = new Map(buttons().map((b) => [b.dataset.view, b]));
+    normalizeOrder(order, VIEWS).forEach((v) => {
+      const b = byView.get(v);
+      nav.appendChild(b);
+      b.title = "드래그해서 순서 변경";
+    });
+  }
+
+  apply(null);
+  chrome.storage.sync.get(K_NAV_ORDER).then((bag) => apply(bag[K_NAV_ORDER]));
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "sync" && changes[K_NAV_ORDER]) apply(changes[K_NAV_ORDER].newValue);
+  });
+
+  // 드래그 앤 드롭
+  let dragging = null;
+  const clearMarks = () => buttons().forEach((b) => b.classList.remove("drop-before", "drop-after"));
+  buttons().forEach((b) => (b.draggable = true));
+
+  nav.addEventListener("dragstart", (e) => {
+    const b = e.target.closest(".nav-btn");
+    if (!b) return;
+    dragging = b.dataset.view;
+    b.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dragging);
+  });
+
+  const dropTarget = (e) => {
+    const b = e.target.closest(".nav-btn");
+    if (!dragging || !b || b.dataset.view === dragging) return null;
+    const r = b.getBoundingClientRect();
+    return { b, before: e.clientX < r.left + r.width / 2 };
+  };
+
+  nav.addEventListener("dragover", (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    clearMarks();
+    const t = dropTarget(e);
+    if (t) t.b.classList.add(t.before ? "drop-before" : "drop-after");
+  });
+
+  nav.addEventListener("dragleave", (e) => {
+    if (!nav.contains(e.relatedTarget)) clearMarks();
+  });
+
+  nav.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const t = dropTarget(e);
+    clearMarks();
+    if (!t) return;
+    const next = moveItem(currentOrder(), dragging, t.b.dataset.view, t.before);
+    apply(next);
+    chrome.storage.sync.set({ [K_NAV_ORDER]: next }).catch(() => toast("메뉴 순서를 저장하지 못했습니다"));
+  });
+
+  nav.addEventListener("dragend", () => {
+    buttons().forEach((b) => b.classList.remove("dragging"));
+    clearMarks();
+    dragging = null;
+  });
+})();
+
+// ---- 현재 탭 사이트 따라가기 ------------------------------------------------
+// 탭을 옮기거나 다른 사이트로 이동하면 그 사이트의 규칙으로 바꾸고, 페이지에서 값을 다시 읽는다.
+let switching = Promise.resolve();
+function switchSite() {
+  switching = switching
+    .then(async () => {
+      const tab = await getActiveTab().catch(() => null);
+      const key = siteKeyFromUrl(tab && tab.url);
+      if (key !== siteKey) {
+        await flushSave();
+        siteKey = key;
+        pickingRuleId = null;
+        advOpen.clear();
+        await loadState(key);
+        renderSiteBar();
+        renderCombineControls();
+        renderRules();
+      }
+      if (siteKey && state.rules.length && tab && tab.status === "complete") await refreshAll({ quiet: true });
+    })
+    .catch((e) => console.error("[uni-assist] 사이트 전환 실패:", e));
+  return switching;
+}
+
+function renderSiteBar() {
+  $("#site-host").textContent = siteKey === "file" ? "로컬 파일" : siteKey || "규칙을 쓸 수 없는 페이지";
+  $("#site-bar").classList.toggle("off", !siteKey);
+  $("#btn-add-rule").disabled = !siteKey;
+}
+
+chrome.tabs.onActivated.addListener(() => switchSite());
+chrome.tabs.onUpdated.addListener(async (tabId, info) => {
+  if (!info.url && info.status !== "complete") return;
+  const tab = await getActiveTab().catch(() => null);
+  if (tab && tab.id === tabId) switchSite();
+});
+chrome.windows.onFocusChanged.addListener(() => switchSite());
+window.addEventListener("pagehide", () => flushSave());
+
 // ---- 초기화 --------------------------------------------------------------
 (async function init() {
   $("#app-version").textContent = `v${chrome.runtime.getManifest().version}`;
-  await loadState();
-  renderCombineControls();
-  renderRules();
+  await migrateLegacyStorage(chrome.storage.local, uid).catch(() => {});
+  await switchSite();
   renderPresets();
-  loadShortcutSettings();
   await initLoginUI({ showView, toast });
 
   // 단축키로 자동 로그인을 시도했는데 잠겨 있어 패널이 열린 경우 → 바로 잠금 화면으로

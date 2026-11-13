@@ -1,6 +1,7 @@
 // 페이지 내 단축키 로직 + 콘텐츠 스크립트 등록용 매치 패턴 검증 (node tools/test-hotkey.mjs)
 import {
   DEFAULT_COMBO,
+  DEFAULT_COPY_COMBO,
   DEFAULT_PANEL_COMBO,
   comboFromEvent,
   displayCombo,
@@ -60,6 +61,8 @@ eq(normalizeHotkey({ combo: "  Alt+L  " }), { combo: "Alt+L", enabled: true }, "
 eq(normalizeHotkey({ combo: "", enabled: false }), { combo: "F2", enabled: false }, "빈 조합은 기본값으로");
 eq(DEFAULT_COMBO, "F2", "로그인/로그아웃 기본 조합은 F2");
 eq(DEFAULT_PANEL_COMBO, "F4", "패널 토글 기본 조합은 F4");
+eq(DEFAULT_COPY_COMBO, "Ctrl+Shift+Y", "추출 복사 기본 조합은 Ctrl+Shift+Y");
+eq(needsTypingGuard(DEFAULT_COPY_COMBO), false, "Ctrl 조합은 입력창에서도 받는다");
 eq(normalizeHotkey(undefined, "F4"), { combo: "F4", enabled: true }, "fallback 조합 적용");
 eq(normalizeHotkey({ combo: "F9" }, "F4"), { combo: "F9", enabled: true }, "지정된 조합이 fallback보다 우선");
 

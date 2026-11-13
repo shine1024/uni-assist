@@ -33,62 +33,75 @@
           </button>
         </section>
 
+        <!-- 현재 사이트 — 규칙은 사이트별로 따로 저장된다 -->
+        <div class="site-bar" id="site-bar">
+          <span class="site-label">현재 사이트</span>
+          <code id="site-host">…</code>
+        </div>
+
         <!-- 규칙 목록 -->
         <section id="rules" class="rules"></section>
 
         <p id="empty-hint" class="empty-hint">
-          <strong>요소 선택</strong> 버튼을 눌러 페이지의 요소를 선택하세요.<br />
-          여러 개를 추가하면 아래에서 순서대로 조합됩니다.
+          <strong>요소 선택</strong>을 누르고 페이지에서 가져올 글자를 클릭하세요.<br />
+          여러 개를 고르면 아래에서 하나로 이어 붙입니다. 규칙은 사이트마다 따로 저장돼요.
         </p>
 
-        <!-- 조합 설정 -->
+        <!-- 조합 결과 -->
         <section class="combine card">
           <div class="card-head">
-            <h2>조합 결과</h2>
-            <div class="seg" id="mode-seg">
-              <button data-mode="join" class="seg-btn active">연결</button>
-              <button data-mode="template" class="seg-btn">템플릿</button>
+            <h2>결과</h2>
+            <div id="join-opts" class="combine-opts inline">
+              <label for="separator">구분자</label>
+              <select id="separator">
+                <option value="none">없음</option>
+                <option value="space">공백</option>
+                <option value="newline">줄바꿈</option>
+                <option value="tab">탭</option>
+                <option value="comma">쉼표(, )</option>
+                <option value="custom">직접 입력…</option>
+              </select>
+              <input id="custom-sep" class="custom-sep hidden" placeholder="구분자" />
             </div>
-          </div>
-
-          <div id="join-opts" class="combine-opts">
-            <label>구분자</label>
-            <select id="separator">
-              <option value="none">없음</option>
-              <option value="space">공백</option>
-              <option value="newline">줄바꿈</option>
-              <option value="tab">탭</option>
-              <option value="comma">쉼표(, )</option>
-              <option value="custom">직접 입력…</option>
-            </select>
-            <input id="custom-sep" class="custom-sep hidden" placeholder="구분자 입력" />
-          </div>
-
-          <div id="template-opts" class="combine-opts hidden">
-            <label>템플릿 <span class="muted">{1}, {2} … = 각 규칙 결과</span></label>
-            <textarea id="template" rows="3" placeholder="예) [{1}] {2} - {3}"></textarea>
           </div>
 
           <div class="result-box">
-            <textarea id="result" rows="3" readonly placeholder="조합 결과가 여기에 표시됩니다"></textarea>
+            <textarea id="result" rows="3" readonly placeholder="선택한 요소의 글자가 여기에 이어 붙습니다"></textarea>
             <div class="result-actions">
-              <button id="btn-refresh" class="btn btn-ghost" title="현재 페이지에서 모든 요소를 다시 추출"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>재추출</button>
+              <button id="btn-refresh" class="btn btn-ghost" title="현재 페이지에서 모든 요소를 다시 읽기"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>다시 읽기</button>
               <button id="btn-copy" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>복사</button>
             </div>
           </div>
+
+          <details class="adv" id="combine-adv">
+            <summary>고급 설정</summary>
+            <div class="adv-body">
+              <div class="adv-row">
+                <span class="muted">조합 방식</span>
+                <div class="seg" id="mode-seg">
+                  <button data-mode="join" class="seg-btn active">연결</button>
+                  <button data-mode="template" class="seg-btn">템플릿</button>
+                </div>
+              </div>
+              <div id="template-opts" class="combine-opts hidden">
+                <label>템플릿 <span class="muted">{1}, {2} … = 각 요소 결과</span></label>
+                <textarea id="template" rows="3" placeholder="예) [{1}] {2} - {3}"></textarea>
+              </div>
+            </div>
+          </details>
         </section>
 
-        <!-- 프리셋 -->
-        <section class="presets card">
-          <div class="card-head">
-            <h2>프리셋</h2>
+        <!-- 프리셋 (고급) -->
+        <details class="presets card adv">
+          <summary>프리셋 <span class="muted">— 규칙 묶음 저장·불러오기</span></summary>
+          <div class="adv-body">
             <div class="header-actions">
               <input id="preset-name" class="preset-name" placeholder="프리셋 이름" />
               <button id="btn-save-preset" class="btn btn-ghost">저장</button>
             </div>
+            <ul id="preset-list" class="preset-list"></ul>
           </div>
-          <ul id="preset-list" class="preset-list"></ul>
-        </section>
+        </details>
       </div>
 
       <!-- ================= 자동 로그인 (신규) ================= -->
@@ -279,14 +292,8 @@
         <section class="shortcut card">
           <div class="card-head">
             <h2><svg class="ic" aria-hidden="true"><use href="#i-keyboard"/></svg>단축키</h2>
-            <button id="btn-change-shortcut" class="btn btn-ghost btn-sm">단축키 변경…</button>
           </div>
-          <ul class="kv">
-            <li><span>텍스트 추출 복사</span><span class="kbd" id="shortcut-key">…</span></li>
-            <li><span>자동 로그인 <span class="muted">(브라우저 전역)</span></span><span class="kbd" id="login-shortcut-key">…</span></li>
-          </ul>
-
-          <h3 class="sub-head">페이지 내 단축키 <span class="muted">— <code>F2</code> 처럼 수정자 없는 키 가능</span></h3>
+          <p class="muted hint-text">「키 지정」을 누르고 원하는 키를 누르세요. <code>F2</code> 처럼 수정자 없는 키도 됩니다.</p>
           <ul class="kv">
             <li>
               <span>로그인 / 로그아웃</span>
@@ -304,19 +311,24 @@
                 <label class="chk"><input type="checkbox" id="panel-hotkey-enabled" /> 사용</label>
               </span>
             </li>
+            <li>
+              <span>텍스트 추출 결과 복사</span>
+              <span class="hk-row">
+                <span class="kbd" id="copy-hotkey">…</span>
+                <button id="btn-capture-copy-hotkey" class="btn btn-sm" data-hk="copy">키 지정</button>
+                <label class="chk"><input type="checkbox" id="copy-hotkey-enabled" /> 사용</label>
+              </span>
+            </li>
           </ul>
           <label class="chk">
             <input type="checkbox" id="hotkey-all-sites" />
-            모든 사이트에서 사용 <span class="muted">(끄면 등록된 로그인 사이트에서만)</span>
+            모든 사이트에서 사용 <span class="muted">(끄면 로그인 등록 사이트·추출 규칙이 있는 사이트에서만)</span>
           </label>
           <p class="muted hint-text" id="page-hotkey-note"></p>
           <p class="muted hint-text">
-            아래 <b>허용 사이트</b>에서 복사 단축키를 누르면, 현재 페이지에서 규칙을 재추출해
-            <b>조합 결과를 자동 복사</b>합니다. (사이드 패널을 열어두지 않아도 동작)
+            복사 단축키는 <b>텍스트 추출 규칙이 있는 사이트</b>에서 현재 페이지를 다시 읽어
+            <b>결과를 바로 복사</b>합니다. (사이드 패널을 열어두지 않아도 동작)
           </p>
-          <label class="muted">허용 사이트 패턴 <span class="muted">(한 줄에 하나, <code>*</code> 와일드카드)</span></label>
-          <textarea id="allowed-patterns" rows="3" spellcheck="false"
-            placeholder="https://labdev.unipost.co.kr/redmine"></textarea>
         </section>
       </div>
     </main>

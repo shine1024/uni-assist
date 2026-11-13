@@ -22,11 +22,11 @@
 ## 권한 (manifest)
 - `sidePanel` — 사이드 패널 사용
 - `scripting` + `host_permissions: <all_urls>` — 콘텐츠 스크립트를 필요 시 주입
-- `storage` — 작업 상태/프리셋/허용 패턴 저장
+- `storage` — 사이트별 추출 규칙(`siteRules`)/프리셋/설정 저장
 - `tabs`, `activeTab` — 활성 탭 조회/메시지 전송
 - `offscreen` + `clipboardWrite` — 서비스 워커에서 클립보드 복사(오프스크린 문서)
-- `commands` (매니페스트 키) — 단축키 `copy-combined`, `auto-login` (전역)
-- 페이지 내 단축키(F2)는 권한 없이 `scripting` + 기존 `host_permissions` 로 동적 등록
+- 단축키(F2 / F4 / Ctrl+Shift+Y)는 모두 페이지 내 방식 — 권한 없이 `scripting` + 기존 `host_permissions` 로 동적 등록.
+  매니페스트 `commands` 는 쓰지 않는다
 - `identity` — 2차 인증의 슬랙 OAuth(`chrome.identity.launchWebAuthFlow`, Redirect `https://<확장ID>.chromiumapp.org/`)
 - `key` (매니페스트 키) — 확장 ID 고정 `gknfpjcapdfgainlgjglmooolalpifml` — 슬랙 앱 Redirect URL 이 이 ID 로 등록돼 있다(예전 unipost-2fa-helper 의 key). 동기화·Redirect URL 이 ID 에 묶이므로 바꾸지 않는다
 
@@ -52,29 +52,30 @@
 - 선택 결과(콘텐츠→패널)는 `chrome.runtime.sendMessage`(브로드캐스트), 재추출 응답은 `tabs.sendMessage`의 응답 콜백 사용.
 - 콘텐츠 스크립트는 항상 주입하지 않고, 동작이 필요한 순간에만 주입. `window.__uaPickerLoaded`로 리스너 중복 등록 방지.
 
-## 단축키 복사 흐름 (특정 사이트 전용)
+## 단축키 복사 흐름 (추출 규칙이 있는 사이트 전용)
 
 ```
-[사용자가 단축키 누름]
-  → chrome.commands.onCommand (service-worker)
-     ├ 활성 탭 URL 조회
-     ├ urlMatches(url, allowedPatterns)  ← 허용 사이트 아니면 즉시 종료(아무 동작 X)
-     ├ storage.local.current(규칙/조합) 로드
+[사용자가 페이지에서 Ctrl+Shift+Y]
+  → hotkey.js keydown → runtime.sendMessage {COPY_HOTKEY}
+     (규칙이 있는 사이트인지는 미리 COPY_HOTKEY_TARGET 으로 물어 둔다 — 아니면 키를 가로채지 않는다)
+  → service-worker runCopyCombined(sender.tab)
+     ├ siteKeyFromUrl(url) → storage.local.siteRules[사이트] 로드  ← 규칙이 없으면 즉시 종료
      ├ ensurePicker(tab) → tabs.sendMessage {EXTRACT_ALL, rules[]} → {values}
      ├ applyTransforms + combineResults  (transform.js 재사용)
      ├ offscreen 문서 생성/재사용 → COPY_TO_CLIPBOARD → 클립보드 복사
      └ tabs.sendMessage {TOAST,"복사됨 ✓"} + action 배지 ✓
 ```
 
-- 단축키는 매니페스트 `commands.copy-combined`(기본 `Ctrl+Shift+Y`). 전역이지만 **URL 패턴으로 게이트**해 "특정 사이트에서만" 충족.
-- 허용 패턴: `storage.local.allowedPatterns`(사이드 패널에서 편집). 매칭은 `src/lib/match.js`(접두어 + `*` 와일드카드).
+- 규칙은 `storage.local.siteRules = { [호스트]: { rules, combine } }` (`src/lib/site-rules.js`). 예전 단일 묶음 `current` 와
+  허용 패턴 `allowedPatterns` 는 설치·업데이트 때 `migrateLegacyStorage()` 가 한 번 옮긴다.
+- 패널에 포커스가 있을 때 누른 복사 키는 패널(sidepanel.js)이 직접 받아 화면의 결과를 복사한다.
 - 클립보드: 서비스 워커는 DOM/포커스가 없어 직접 복사 불가 → `offscreen` 문서에서 `textarea`+`execCommand('copy')`.
 
 ## 자동 로그인 / 로그아웃 흐름
 
 ```
-[사용자가 Ctrl+Shift+L]
-  → chrome.commands.onCommand ("auto-login") → runAutoLogin()
+[사용자가 페이지에서 F2]
+  → hotkey.js → {LOGIN_HOTKEY} → runAutoLogin({tabId: sender.tab.id})
      ├ 활성 탭 URL이 http(s)인지 확인            ← chrome:// 등은 즉시 종료
      ├ vault.acquireRunLock()                    ← storage.session 기반, 6초 내 중복 실행 차단
      ├ loadSites()  (storage.sync, 사이트당 1항목)
@@ -119,7 +120,7 @@
 > (첫 계정 추가 시 자동으로 기본값이 되므로 사실상 항상 그 상태가 된다). 맨 앞 정렬 + 포커스만 담당하고,
 > `Enter` 한 번으로 실행되므로 체감 비용은 키 하나다.
 
-## 페이지 내 단축키 (F2 / F4) — 왜 콘텐츠 스크립트인가
+## 페이지 내 단축키 (F2 / F4 / Ctrl+Shift+Y) — 왜 콘텐츠 스크립트인가
 
 Chrome `commands` API 의 제약(공식 문서 확인):
 - 단축키는 **`Ctrl` 또는 `Alt` 를 반드시 포함**해야 한다 (미디어 키만 예외)
@@ -127,6 +128,7 @@ Chrome `commands` API 의 제약(공식 문서 확인):
 - 매니페스트가 제안할 수 있는 단축키는 최대 4개이며, 사용자가 `chrome://extensions/shortcuts` 에서 바꿀 때도 같은 규칙이 적용된다
 
 → `F2`·`F4` 단독 키는 commands 로 **등록 자체가 불가능**하므로, 페이지에서 직접 받는다.
+  복사 단축키도 키를 패널에서 바꿀 수 있도록 같은 방식으로 옮겼다(commands 는 더 이상 쓰지 않음).
 
 ```
 [서비스 워커 부팅 / 사이트·설정 변경 시]
@@ -134,7 +136,7 @@ Chrome `commands` API 의 제약(공식 문서 확인):
    ├ loadSites() + getSettings()
    ├ hotkey.enabled 가 false → 등록 해제만 하고 종료
    ├ hotkeyAllSites !== false → ["http://*/*","https://*/*"]   (기본: 패널 토글을 어디서든)
-   │               false        → toMatchPatterns(sites)        (등록 사이트만, 범위 최소화)
+   │               false        → toMatchPatterns(sites) + 추출 규칙 사이트  (범위 최소화)
    ├ 패턴이 0개 → 등록하지 않음    ← 빈 matches 로는 registerContentScripts 호출 불가
    └ registerContentScripts([{ id:"ua-login-hotkey", js:["src/content/hotkey.js"],
                                runAt:"document_start", allFrames:false,
@@ -165,7 +167,7 @@ Chrome `commands` API 의 제약(공식 문서 확인):
 
 - 등록 범위가 느슨해지는 부분(경로 접두어, 포트 생략)은 **`siteMatches()` 가 다시 엄격하게 검사**하므로
   자격증명 주입 조건은 전역 단축키 경로와 동일하다.
-- 한계: 브라우저 UI(주소창 등)에 포커스가 있으면 동작하지 않는다 → 그 경우는 전역 단축키(`Ctrl+Shift+L`)를 쓴다.
+- 한계: 브라우저 UI(주소창 등)나 페이지 안 iframe 에 포커스가 있으면 동작하지 않는다 → 페이지 본문을 클릭한 뒤 누른다.
 - 콘텐츠 스크립트는 ES 모듈이 아니어서 `src/lib/hotkey.js` 를 import 할 수 없다.
   `comboFromEvent`/`isTypingTarget`/`needsTypingGuard` 세 함수를 복제했고,
   **복제본이 lib 와 갈라지면 `tools/test-hotkey.mjs` 가 실패**한다(파일에서 해당 구간을 꺼내 같은 입력으로 비교).

@@ -146,6 +146,7 @@ const defs = await store.getSettings();
 eq(defs.autoLockMinutes, 60, "자동 잠금 기본 1시간");
 eq(defs.hotkey, { combo: "F2", enabled: true }, "로그인 단축키 기본 F2");
 eq(defs.panelHotkey, { combo: "F4", enabled: true }, "패널 단축키 기본 F4");
+eq(defs.copyHotkey, { combo: "Ctrl+Shift+Y", enabled: true }, "복사 단축키 기본 Ctrl+Shift+Y");
 eq(defs.hotkeyAllSites, true, "기본은 모든 사이트에서 단축키 사용");
 
 // 중첩 객체가 다른 설정 변경에 휩쓸려 날아가지 않아야 한다

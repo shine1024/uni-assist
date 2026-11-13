@@ -1,4 +1,5 @@
 // 사이드 패널: 설정 → 백업 (내보내기 / 가져오기)
+import { K_SITE_RULES } from "../lib/site-rules.js";
 import { backupFileName, buildBackup, parseBackup, summarizeBackup, SYNC_PREFIX } from "../lib/backup.js";
 import * as vault from "../lib/vault.js";
 
@@ -41,6 +42,8 @@ async function importBackup(file) {
   const stale = Object.keys(current).filter((k) => k.startsWith(SYNC_PREFIX) && !(k in data.sync));
   if (stale.length) await chrome.storage.sync.remove(stale);
   await chrome.storage.sync.set(data.sync); // 금고 정보와 사이트를 한 번에 쓴다
+  // 예전 형식 백업(규칙 묶음 하나)이면 사이트별 저장을 비워, 패널이 열릴 때 다시 옮기게 한다
+  if (!(K_SITE_RULES in data.local) && data.local.current) await chrome.storage.local.remove(K_SITE_RULES);
   if (Object.keys(data.local).length) await chrome.storage.local.set(data.local);
   await vault.lock(); // 이전 금고의 해제 세션은 새 데이터에 맞지 않는다
 

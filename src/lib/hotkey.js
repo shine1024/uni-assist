@@ -10,8 +10,10 @@
 
 export const DEFAULT_COMBO = "F2"; // 로그인 / 로그아웃
 export const DEFAULT_PANEL_COMBO = "F4"; // 사이드 패널 열기·닫기
+export const DEFAULT_COPY_COMBO = "Ctrl+Shift+Y"; // 텍스트 추출 결과 복사 (규칙이 있는 사이트에서만)
 export const DEFAULT_HOTKEY = { combo: DEFAULT_COMBO, enabled: true };
 export const DEFAULT_PANEL_HOTKEY = { combo: DEFAULT_PANEL_COMBO, enabled: true };
+export const DEFAULT_COPY_HOTKEY = { combo: DEFAULT_COPY_COMBO, enabled: true };
 
 const MOD_KEYS = new Set(["Control", "Alt", "Shift", "Meta", "CapsLock", "Dead"]);
 

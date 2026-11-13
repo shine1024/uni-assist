@@ -27,22 +27,6 @@
   "side_panel": {
     "default_path": "src/sidepanel/sidepanel.html"
   },
-  "commands": {
-    "copy-combined": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+Y",
-        "mac": "Command+Shift+Y"
-      },
-      "description": "조합 결과를 복사 (허용한 사이트에서만 동작)"
-    },
-    "auto-login": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+L",
-        "mac": "Command+Shift+L"
-      },
-      "description": "등록된 사이트에서 자동 로그인 (잠금 해제 필요)"
-    }
-  },
   "permissions": [
     "sidePanel",
     "scripting",

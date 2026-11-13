@@ -165,9 +165,7 @@ console.log("범위·권한");
   const manifest = JSON.parse(read("manifest.json"));
   eq(manifest.permissions.includes("nativeMessaging"), false, "nativeMessaging 권한 제거 (POP3 호스트 제거)");
   eq(manifest.permissions.includes("identity"), true, "identity 권한 (슬랙 OAuth)");
-  eq(Object.hasOwn(manifest.commands, "approval-login"), false, "결재대기함 단축키 제거");
-  const keys = Object.values(manifest.commands).map((c) => c.suggested_key.default);
-  eq(new Set(keys).size, keys.length, "단축키 중복 없음");
+  eq(manifest.commands, undefined, "크롬 확장 단축키(commands) 없음 — 모든 단축키는 페이지 내 방식");
 
   const sources = ["src/lib/approval-flow.js", "src/lib/approval-config.js", "src/background/approval.js", "src/background/approval-page-actions.js"];
   const combined = sources.map(read).join("\n");

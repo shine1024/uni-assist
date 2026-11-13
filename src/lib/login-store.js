@@ -36,6 +36,7 @@ export const DEFAULT_SETTINGS = {
   autoLockMinutes: 60,
   hotkey: { combo: "F2", enabled: true }, // 로그인 / 로그아웃
   panelHotkey: { combo: "F4", enabled: true }, // 사이드 패널 열기·닫기
+  copyHotkey: { combo: "Ctrl+Shift+Y", enabled: true }, // 텍스트 추출 결과 복사
   hotkeyAllSites: true,
 };
 
@@ -179,6 +180,7 @@ export async function getSettings() {
     autoLockMinutes: normalizeAutoLock(s ? s.autoLockMinutes : undefined),
     hotkey: { ...DEFAULT_SETTINGS.hotkey, ...((s && s.hotkey) || {}) },
     panelHotkey: { ...DEFAULT_SETTINGS.panelHotkey, ...((s && s.panelHotkey) || {}) },
+    copyHotkey: { ...DEFAULT_SETTINGS.copyHotkey, ...((s && s.copyHotkey) || {}) },
   };
 }
 

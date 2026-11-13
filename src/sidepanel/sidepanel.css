@@ -308,6 +308,71 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
   min-height: 18px;
 }
 .rule-result.error { color: var(--danger); border-color: var(--danger); background: var(--danger-wash); }
+.rule-result.missing { color: var(--danger); }
+
+/* 현재 사이트 표시 — 규칙은 사이트별로 저장된다 */
+.site-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+.site-bar .site-label { color: var(--muted); flex: none; }
+.site-bar code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: 12px/1.5 var(--mono);
+}
+.site-bar.off code { background: var(--wash); color: var(--muted); font-family: var(--font); }
+
+/* 「고급 설정」 접기 — 평소에는 감춰 두는 기능 */
+details.adv > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+details.adv > summary::-webkit-details-marker { display: none; }
+details.adv > summary::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+details.adv[open] > summary::before { transform: rotate(45deg); }
+details.adv > summary:hover { color: var(--text); }
+details.adv > summary:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--radius-xs); }
+details.adv .adv-body { margin-top: 10px; }
+details.adv .adv-on {
+  padding: 1px 6px;
+  border-radius: var(--pill);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: 11px;
+}
+.adv-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 12px; }
+
+/* 프리셋 카드는 통째로 접힌다 */
+details.presets.card > summary { margin-top: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+details.presets.card > summary .muted { font-size: 12px; font-weight: 400; }
+details.presets .header-actions { margin-bottom: 10px; }
+details.presets .preset-name { flex: 1; width: auto; }
 .rule-result .arrow { color: var(--faint); }
 
 /* 세그먼트 (알약형 탭) */
@@ -328,6 +393,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 .combine-opts { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .combine-opts label { font-size: 12px; color: var(--muted); }
+.combine-opts.inline { margin-bottom: 0; justify-content: flex-end; }
+.combine-opts.inline .custom-sep { width: 90px; }
 .custom-sep { width: 120px; }
 
 .result-box { display: flex; flex-direction: column; gap: 8px; }
@@ -445,6 +512,22 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
   background: var(--accent);
   box-shadow: 0 0 10px var(--accent-glow);
 }
+
+/* 드래그로 순서 변경 — 끌고 있는 메뉴는 흐리게, 놓일 자리는 세로 강조선 */
+.nav-btn.dragging { opacity: 0.4; }
+.nav-btn.drop-before::before,
+.nav-btn.drop-after::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: var(--pill);
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.nav-btn.drop-before::before { left: -2px; }
+.nav-btn.drop-after::before { right: -2px; }
 
 .view { display: flex; flex-direction: column; gap: 12px; }
 

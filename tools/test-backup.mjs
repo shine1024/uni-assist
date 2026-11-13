@@ -46,7 +46,10 @@ eq(Object.keys(backup.sync).sort(), ["ua_login_index", "ua_login_settings", "ua_
 eq(Object.keys(backup.local).sort(), ["allowedPatterns", "current", "presets"], "local 은 추출 데이터만");
 eq(backup.sync.ua_site_s1.accounts[0].secret, { iv: "x", ct: "y" }, "비밀번호는 암호문 그대로");
 eq(backupFileName(now), "uni-assist-backup-20261111.json", "파일 이름에 날짜");
-eq(summarizeBackup(backup), { sites: 1, rules: 2, presets: 1, hasVault: true }, "요약");
+eq(summarizeBackup(backup), { sites: 1, rules: 2, presets: 1, hasVault: true }, "요약 (예전 형식 규칙)");
+const withSites = buildBackup({ sync, local: { ...local, siteRules: { "a.com": { rules: [{}, {}, {}] }, "b.com": { rules: [{}] } } } }, now);
+eq(Object.keys(withSites.local).sort(), ["allowedPatterns", "current", "presets", "siteRules"], "사이트별 규칙도 포함");
+eq(summarizeBackup(withSites).rules, 4, "요약은 사이트별 규칙 합계");
 
 console.log("가져오기");
 const round = parseBackup(JSON.stringify(backup));

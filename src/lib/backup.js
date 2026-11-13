@@ -4,13 +4,14 @@
 // 옮겨 갈 데이터를 파일로 꺼냈다가 다시 넣는 용도다.
 //  - sync : 자동 로그인 데이터(`ua_` 로 시작하는 키 전부). 비밀번호는 원래 저장된 암호문 그대로라
 //           파일만으로는 풀 수 없고, 같은 마스터 비밀번호가 있어야 한다.
-//  - local: 텍스트 추출 데이터(current / presets / allowedPatterns)
+//  - local: 텍스트 추출 데이터(siteRules / presets, 예전 형식 current / allowedPatterns)
 import { K_VAULT, SITE_PREFIX } from "./login-store.js";
+import { K_SITE_RULES, countSiteRules } from "./site-rules.js";
 
 export const BACKUP_FORMAT = "uni-assist-backup";
 export const BACKUP_VERSION = 1;
 export const SYNC_PREFIX = "ua_";
-export const LOCAL_KEYS = ["current", "presets", "allowedPatterns"];
+export const LOCAL_KEYS = [K_SITE_RULES, "presets", "current", "allowedPatterns"];
 
 const isPlainObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 
@@ -45,7 +46,11 @@ export function backupFileName(now = new Date()) {
 /** 백업 요약 (가져오기 전 확인 문구용) */
 export function summarizeBackup({ sync, local }) {
   const sites = Object.keys(sync).filter((k) => k.startsWith(SITE_PREFIX)).length;
-  const rules = isPlainObject(local.current) && Array.isArray(local.current.rules) ? local.current.rules.length : 0;
+  const rules = isPlainObject(local[K_SITE_RULES])
+    ? countSiteRules(local[K_SITE_RULES])
+    : isPlainObject(local.current) && Array.isArray(local.current.rules)
+      ? local.current.rules.length
+      : 0;
   const presets = Array.isArray(local.presets) ? local.presets.length : 0;
   return { sites, rules, presets, hasVault: !!sync[K_VAULT] };
 }
