@@ -95,9 +95,26 @@
   }
 
   if (tryStart()) return;
+  // 성능: 화면이 자주 바뀌는 페이지에서도 확인은 CHECK_GAP_MS 에 한 번만 한다.
+  // (확인할 때 보이는지 재느라 레이아웃 계산이 일어나므로 바뀔 때마다 하면 페이지가 느려질 수 있다)
+  // 속성은 보임/숨김에 영향을 주는 것만 본다.
+  const CHECK_GAP_MS = 250;
+  let pending = null;
   const observer = new MutationObserver(() => {
-    if (!running && tryStart()) observer.disconnect();
+    if (pending || running) return;
+    pending = setTimeout(() => {
+      pending = null;
+      if (!running && document.querySelector(OTP_INPUT) && tryStart()) observer.disconnect();
+    }, CHECK_GAP_MS);
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
-  setTimeout(() => observer.disconnect(), 10 * 60 * 1000); // 화면이 끝내 안 뜨면 감시를 멈춘다
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["style", "class", "hidden"],
+  });
+  setTimeout(() => {
+    observer.disconnect(); // 화면이 끝내 안 뜨면 감시를 멈춘다
+    clearTimeout(pending);
+  }, 10 * 60 * 1000);
 })();

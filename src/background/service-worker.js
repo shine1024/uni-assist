@@ -30,6 +30,7 @@ import {
   setAutoFill,
   syncAutoFillRegistration,
 } from "./approval.js";
+import { otpAction } from "./otp.js";
 
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -128,21 +129,31 @@ async function setupOffscreen() {
   try {
     await chrome.offscreen.createDocument({
       url: "src/offscreen/offscreen.html",
-      reasons: ["CLIPBOARD"],
-      justification: "조합 결과를 클립보드에 복사",
+      reasons: ["CLIPBOARD", "BLOBS"],
+      justification: "조합 결과·OTP 코드를 클립보드에 복사하고, OTP 등록용 QR 이미지를 해석",
     });
   } catch (e) {
     // 동시 생성 경합 등은 무시 (이미 존재하면 OK)
   }
 }
 
-async function copyToClipboard(text) {
+/** 이미지(data URL) → QR 내용. 해석 라이브러리는 오프스크린 문서가 처음 스캔할 때만 불러온다 */
+async function decodeQr(dataUrl) {
   await setupOffscreen();
-  await chrome.runtime.sendMessage({
+  const r = await chrome.runtime.sendMessage({ target: "offscreen", type: "DECODE_QR", dataUrl });
+  return r && r.ok ? r.text : null;
+}
+
+/** clearAfterMs > 0 이면 그 시간 뒤 클립보드가 아직 같은 내용일 때만 비운다 (OTP 코드용) */
+async function copyToClipboard(text, clearAfterMs = 0) {
+  await setupOffscreen();
+  const r = await chrome.runtime.sendMessage({
     target: "offscreen",
     type: "COPY_TO_CLIPBOARD",
     text,
+    clearAfterMs,
   });
+  if (r && r.ok === false) throw new Error("클립보드에 복사하지 못했어요");
 }
 
 // ---- 아이콘 배지로 결과 표시 ---------------------------------------------
@@ -395,6 +406,14 @@ async function runAutoLogin(opts = {}) {
 // ---- 사이드 패널 ↔ 서비스 워커 ------------------------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return;
+  if (msg.target === "offscreen") return; // 오프스크린 문서가 받는 메시지
+  const otpRun = otpAction(msg, { copyText: copyToClipboard, decodeQr });
+  if (otpRun) {
+    // OTP 비밀키·코드를 다루므로 확장 페이지(사이드 패널)에서만 받는다 — 웹페이지 스크립트는 거절
+    if (!isExtensionPage(sender, chrome.runtime.id)) return;
+    otpRun().then(sendResponse);
+    return true;
+  }
   const approvalAction = {
     APPROVAL_STATUS: approvalStatus,
     APPROVAL_FETCH_OTP: () => fetchApprovalOtp(msg.oldest),
@@ -460,11 +479,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     runCopyCombined(sender && sender.tab);
     return;
   }
-  if (msg.type === "COPY_HOTKEY_TARGET") {
+  if (msg.type === "HOTKEY_TARGETS") {
+    // 페이지 단축키 스크립트가 "이 페이지에서 키를 가로채도 되는지" 한 번에 묻는다
+    //  auth: 등록된 로그인 사이트인지 / copy: 텍스트 추출 규칙이 있는 사이트인지
     const url = (sender && (sender.url || (sender.tab && sender.tab.url))) || "";
-    siteHasRules(url)
-      .then((target) => sendResponse({ target }))
-      .catch(() => sendResponse({ target: false }));
+    Promise.all([
+      loadSites().then((sites) => isLoginHotkeyTarget(url, sites)).catch(() => false),
+      siteHasRules(url).catch(() => false),
+    ]).then(([auth, copy]) => sendResponse({ auth, copy }));
     return true;
   }
   if (msg.type === "LOGIN_HOTKEY") {
@@ -472,14 +494,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const tabId = sender && sender.tab && sender.tab.id;
     if (!tabId) return;
     runAutoLogin({ tabId }).then(sendResponse);
-    return true;
-  }
-  if (msg.type === "LOGIN_HOTKEY_TARGET") {
-    // 콘텐츠 스크립트가 "이 페이지에서 F2 를 가로채도 되는지" 묻는다 (등록된 사이트만 true)
-    const url = (sender && (sender.url || (sender.tab && sender.tab.url))) || "";
-    loadSites()
-      .then((sites) => sendResponse({ target: isLoginHotkeyTarget(url, sites) }))
-      .catch(() => sendResponse({ target: false }));
     return true;
   }
   if (msg.type === "LOGIN_HAS_PENDING") {

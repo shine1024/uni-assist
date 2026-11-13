@@ -5,7 +5,9 @@
 //  - sync : 자동 로그인 데이터(`ua_` 로 시작하는 키 전부). 비밀번호는 원래 저장된 암호문 그대로라
 //           파일만으로는 풀 수 없고, 같은 마스터 비밀번호가 있어야 한다.
 //  - local: 텍스트 추출 데이터(siteRules / presets, 예전 형식 current / allowedPatterns)
+//           + OTP 인증기(`ua_otp_` 로 시작하는 키 — 감싼 키와 암호화된 항목 그대로)
 import { K_VAULT, SITE_PREFIX } from "./login-store.js";
+import { K_OTP_KEY, OTP_ENTRY_PREFIX, OTP_LOCAL_PREFIX } from "./otp-store.js";
 import { K_SITE_RULES, countSiteRules } from "./site-rules.js";
 
 export const BACKUP_FORMAT = "uni-assist-backup";
@@ -24,8 +26,12 @@ function pickSync(sync) {
 function pickLocal(local) {
   const out = {};
   for (const k of LOCAL_KEYS) if (local && local[k] !== undefined) out[k] = local[k];
+  for (const [k, v] of Object.entries(local || {})) if (k.startsWith(OTP_LOCAL_PREFIX)) out[k] = v;
   return out;
 }
+
+/** 이 키가 백업이 관리하는 local 키인지 (가져올 때 지울 대상 판단용) */
+export const isBackupLocalKey = (k) => LOCAL_KEYS.includes(k) || k.startsWith(OTP_LOCAL_PREFIX);
 
 /** storage 내용 → 백업 객체 */
 export function buildBackup({ sync, local }, now = new Date()) {
@@ -52,7 +58,8 @@ export function summarizeBackup({ sync, local }) {
       ? local.current.rules.length
       : 0;
   const presets = Array.isArray(local.presets) ? local.presets.length : 0;
-  return { sites, rules, presets, hasVault: !!sync[K_VAULT] };
+  const otps = Object.keys(local).filter((k) => k.startsWith(OTP_ENTRY_PREFIX)).length;
+  return { sites, rules, presets, otps, hasOtp: !!local[K_OTP_KEY], hasVault: !!sync[K_VAULT] };
 }
 
 /**
@@ -80,6 +87,10 @@ export function parseBackup(text) {
   const hasSites = Object.keys(sync).some((k) => k.startsWith(SITE_PREFIX));
   if (hasSites && !sync[K_VAULT]) {
     throw new Error("백업에 금고 정보가 없어 저장된 비밀번호를 복원할 수 없어요");
+  }
+  const hasOtp = Object.keys(local).some((k) => k.startsWith(OTP_ENTRY_PREFIX));
+  if (hasOtp && !local[K_OTP_KEY]) {
+    throw new Error("백업에 OTP 키 정보가 없어 OTP 를 복원할 수 없어요");
   }
   return { sync, local };
 }

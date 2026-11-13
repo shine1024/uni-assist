@@ -714,3 +714,70 @@ b { font-weight: 600; }
   letter-spacing: 3px;
   user-select: all;
 }
+
+/* 메뉴 이름은 <br /> 로 직접 나눈 곳에서만 줄을 바꾼다(유니클라우드 / 2차 인증). 좁으면 줄마다 말줄임 */
+.nav-btn span { display: block; white-space: nowrap; text-align: center; line-height: 1.15; }
+
+/* ===== OTP 인증기 ===== */
+.otp-main { display: flex; flex-direction: column; gap: 10px; }
+#otp-search { width: 100%; }
+.otp-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.otp-add-grid .btn { justify-content: flex-start; }
+.otp-add-hint { margin: 10px 0 0; }
+#otp-add-manual, #otp-add-text { margin-top: 10px; }
+#otp-text { width: 100%; font: 11px/1.5 var(--mono); }
+.otp-adv { margin: 8px 0 0; }
+.otp-set-note { font-size: 11px; }
+.otp-set-gap { margin-top: 8px; }
+
+.otp-list { display: flex; flex-direction: column; gap: 6px; }
+.otp-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.otp-item:hover, .otp-item:focus-within { border-color: var(--border-strong); background: var(--wash); }
+.otp-item.dragging { opacity: 0.4; }
+.otp-item.drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
+.otp-item.drop-after { box-shadow: 0 2px 0 0 var(--accent); }
+.otp-item.broken { border-style: dashed; color: var(--muted); }
+.otp-who { flex: 1; min-width: 0; }
+.otp-issuer { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otp-account { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otp-num {
+  flex: none;
+  padding: 2px 6px;
+  font: 500 22px/1.1 var(--mono);
+  letter-spacing: 1.5px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+.otp-num:hover { color: var(--accent); }
+.otp-num:focus-visible { outline: none; box-shadow: var(--focus); }
+.otp-num .mask { display: none; color: var(--faint); letter-spacing: 3px; }
+.otp-list.masked .otp-item:not(:hover):not(:focus-within) .otp-num .real { display: none; }
+.otp-list.masked .otp-item:not(:hover):not(:focus-within) .otp-num .mask { display: inline; }
+.otp-num.soon { color: var(--danger); }
+.otp-timer { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--hairline); }
+.otp-timer i { display: block; height: 100%; background: var(--accent); transition: width 1s linear; }
+.otp-timer i.soon { background: var(--danger); }
+.otp-sec { flex: none; width: 22px; font: 11px/1 var(--mono); color: var(--faint); text-align: right; }
+
+.otp-preview-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; max-height: 280px; overflow: auto; }
+.otp-preview-list .chk { color: var(--text); padding: 4px 0; }
+.otp-preview-list .tag { margin-left: 4px; }
+
+#otp-detail .field-col { margin-bottom: 10px; }
+.otp-secret-box { margin-top: 8px; padding: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.otp-secret-box code { display: block; word-break: break-all; font-size: 12px; user-select: all; }
+.otp-secret-box code + code { margin-top: 6px; font-size: 10px; color: var(--muted); }

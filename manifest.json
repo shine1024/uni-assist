@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Uni-Assist 도우미",
-  "version": "0.6.0",
-  "description": "웹 업무 생산성을 돕는 도우미. 텍스트 추출(요소 선택·정규식 변환·조합 복사)과 사이트별 자동 로그인/로그아웃(AES-256-GCM 암호화·PC 간 동기화).",
+  "version": "0.7.0",
+  "description": "웹 업무 도우미 — 텍스트 추출·조합 복사, 사이트별 자동 로그인(AES-256-GCM·PC 간 동기화), OTP 인증기(TOTP·QR 스캔).",
   "minimum_chrome_version": "114",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAss94/scIn3EaC0XcuUk5WSeoTR0v+TMNVaUuVprUXOf53vmaVLYZ6UP7Lv9MhiLxCbpNqPlikHt74bhdSxoOVt/pTVC9nn2qcA0UeqrLiA1CQzv3KwyOxkAmZLU2rKgJqa5uMBYGmmw9tmIvlbVkWshO0A8zSoJ3fUC4TcizrUTU0AmVmsqVcN3W2BVF9kDPxDCJAsxnjq4a8V4NrSwEfgifMJVb8JiOMQQiNsHRzGQmvrQZGw/w2mcg1j65n91ninzhm+GvsopSBN6HgseCUYH0BsSkPhB0/FdFsV8+2iYcUbnD/Opy+o9Cy02pjLe33UfdEkmUSpMItjzLp5XTYwIDAQAB",
   "icons": {
@@ -35,6 +35,7 @@
     "activeTab",
     "offscreen",
     "clipboardWrite",
+    "clipboardRead",
     "identity"
   ],
   "host_permissions": [

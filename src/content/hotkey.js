@@ -80,41 +80,55 @@
   }
 
   // 이 리스너는 패널 토글(F4) 때문에 모든 페이지에 심긴다.
-  // 로그인 단축키는 **등록된 사이트에서만** 가로채고, 그 외에는 키를 페이지에 그대로 넘긴다.
-  // (키 입력 시점에 동기적으로 판단해야 하므로 미리 물어 두고, 사이트 목록이 바뀌면 다시 묻는다)
+  //  - 로그인 단축키는 **등록된 사이트에서만**, 복사 단축키는 **텍스트 추출 규칙이 있는 사이트에서만** 가로채고,
+  //    그 외에는 키를 페이지에 그대로 넘긴다. 키 입력 시점에 동기적으로 판단해야 해서 서비스 워커에 미리 물어 둔다.
+  //    (규칙은 storage.local 에 있고 콘텐츠 스크립트는 local 을 못 읽는다 — service-worker.js 의 setAccessLevel)
+  //  - 성능: 묻는 것은 서비스 워커를 깨우므로 줄인다.
+  //    · 두 가지를 **한 번의 메시지**(HOTKEY_TARGETS)로 묻는다
+  //    · 보이지 않는 탭(백그라운드로 연 탭, 세션 복원)은 **처음 보일 때까지** 묻지 않는다
+  //    · 탭 전환·포커스 때 다시 묻는 것은 TARGET_TTL_MS 에 한 번만 (패널에서 규칙을 막 추가한 경우는
+  //      아래 keydown 의 soft 경로가 복사 요청을 보내고 다시 물어서 메운다)
+  //    · 로그인·복사 단축키를 둘 다 꺼 두면 아예 묻지 않는다
+  const TARGET_TTL_MS = 10000;
   let authTarget = false;
-  function refreshAuthTarget() {
-    chrome.runtime
-      .sendMessage({ type: "LOGIN_HOTKEY_TARGET" })
-      .then((r) => (authTarget = !!(r && r.target)))
-      .catch(() => (authTarget = false));
-  }
-  refreshAuthTarget();
-
-  // 복사 단축키는 **텍스트 추출 규칙이 있는 사이트에서만** 가로챈다.
-  // 규칙은 storage.local 에 있고 콘텐츠 스크립트는 local 을 못 읽으므로(service-worker.js 의 setAccessLevel)
-  // 서비스 워커에 묻는다. 패널에서 규칙을 추가할 수 있으니 페이지로 돌아올 때마다 다시 묻는다.
   let copyTarget = false;
-  function refreshCopyTarget() {
-    if (!active()) return;
-    chrome.runtime
-      .sendMessage({ type: "COPY_HOTKEY_TARGET" })
-      .then((r) => (copyTarget = !!(r && r.target)))
-      .catch(() => (copyTarget = false));
-  }
-  refreshCopyTarget();
-  window.addEventListener("focus", refreshCopyTarget);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") refreshCopyTarget();
-  });
+  let settingsLoaded = false;
+  let askedAt = 0;
 
-  chrome.storage.sync.get(SETTINGS_KEY).then((bag) => applySettings(bag[SETTINGS_KEY]));
+  function refreshTargets(force = false) {
+    if (!active() || !settingsLoaded) return;
+    if (!auth.enabled && !copy.enabled) return;
+    if (document.visibilityState !== "visible") return; // 보일 때 visibilitychange 에서 다시 온다
+    const now = Date.now();
+    if (!force && now - askedAt < TARGET_TTL_MS) return;
+    askedAt = now;
+    chrome.runtime
+      .sendMessage({ type: "HOTKEY_TARGETS" })
+      .then((r) => {
+        authTarget = !!(r && r.auth);
+        copyTarget = !!(r && r.copy);
+      })
+      .catch(() => {
+        authTarget = copyTarget = false;
+      });
+  }
+
+  window.addEventListener("focus", () => refreshTargets());
+  document.addEventListener("visibilitychange", () => refreshTargets());
+
+  chrome.storage.sync.get(SETTINGS_KEY).then((bag) => {
+    applySettings(bag[SETTINGS_KEY]);
+    settingsLoaded = true;
+    refreshTargets(true);
+  });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync") return;
-    if (changes[SETTINGS_KEY]) applySettings(changes[SETTINGS_KEY].newValue);
-    if (Object.keys(changes).some((k) => k.startsWith("ua_site_") || k === "ua_login_index")) {
-      refreshAuthTarget();
+    const settingsChanged = !!changes[SETTINGS_KEY];
+    if (settingsChanged) applySettings(changes[SETTINGS_KEY].newValue);
+    if (settingsChanged || Object.keys(changes).some((k) => k.startsWith("ua_site_") || k === "ua_login_index")) {
+      askedAt = 0; // 다음에 보일 때 바로 다시 묻는다
+      refreshTargets(true);
     }
   });
 
@@ -151,7 +165,7 @@
 
       if (hit.soft) {
         fire(hit.kind, hit.msg);
-        refreshCopyTarget();
+        refreshTargets(true);
         return;
       }
       e.preventDefault();

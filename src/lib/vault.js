@@ -119,6 +119,14 @@ export async function unlock(masterPassword) {
   return true;
 }
 
+/** 세션을 건드리지 않고 마스터 비밀번호가 맞는지만 확인한다 (OTP 인증기가 같은 비밀번호를 쓰는지 확인용) */
+export async function verifyMaster(masterPassword) {
+  const meta = await getVaultMeta();
+  if (!meta) return false;
+  const key = await deriveKey(masterPassword, meta.salt, meta.iterations || DEFAULT_ITERATIONS);
+  return checkVerifier(key, meta.verifier);
+}
+
 export async function lock() {
   await chrome.storage.session.remove([S_UNLOCK]);
 }

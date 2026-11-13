@@ -6,6 +6,7 @@ import { ensurePicker, getActiveTab, injectable } from "../lib/tabs.js";
 import { initLoginUI, onViewShown } from "./login.js";
 import { initApprovalUI, onApprovalShown } from "./approval.js";
 import { initBackupUI } from "./backup.js";
+import { initOtpUI, onOtpShown } from "./otp.js";
 import { DEFAULT_COPY_COMBO, DEFAULT_PANEL_COMBO, comboFromEvent, isTypingTarget, needsTypingGuard, normalizeHotkey } from "../lib/hotkey.js";
 import { K_SETTINGS } from "../lib/login-store.js";
 import { K_NAV_ORDER, moveItem, normalizeOrder } from "../lib/nav-order.js";
@@ -577,14 +578,16 @@ function toast(msg) {
 })();
 
 // ---- 메뉴(뷰) 전환 -------------------------------------------------------
-const VIEWS = ["extract", "login", "approval", "settings"];
+const VIEWS = ["extract", "login", "otp", "approval", "settings"];
 initApprovalUI();
 initBackupUI({ toast });
+initOtpUI({ showView: (v) => showView(v), toast });
 
 function showView(name) {
   VIEWS.forEach((v) => $(`#view-${v}`).classList.toggle("hidden", v !== name));
   $$(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   onViewShown(name); // 자동 로그인/설정 화면은 열릴 때마다 최신 상태로
+  onOtpShown(name);
   if (name === "approval") onApprovalShown();
 }
 

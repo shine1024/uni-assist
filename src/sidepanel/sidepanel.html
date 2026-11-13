@@ -19,7 +19,8 @@
     <nav class="nav" id="nav">
       <button class="nav-btn active" data-view="extract"><svg class="ic" aria-hidden="true"><use href="#i-extract"/></svg><span>텍스트 추출</span></button>
       <button class="nav-btn" data-view="login"><svg class="ic" aria-hidden="true"><use href="#i-login"/></svg><span>자동 로그인</span></button>
-      <button class="nav-btn" data-view="approval"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span>2차 인증</span></button>
+      <button class="nav-btn" data-view="otp" title="OTP 인증기"><svg class="ic" aria-hidden="true"><use href="#i-otp"/></svg><span>OTP 인증기</span></button>
+      <button class="nav-btn" data-view="approval" title="유니클라우드 2차 인증"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg><span>유니클라우드<br />2차 인증</span></button>
       <button class="nav-btn" data-view="settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span>설정</span></button>
     </nav>
 
@@ -149,10 +150,113 @@
         <section class="hidden" id="site-detail"></section>
       </div>
 
-      <!-- ================= 2차 인증 OTP ================= -->
+      <!-- ================= OTP 인증기 (TOTP) ================= -->
+      <div class="view hidden" id="view-otp">
+        <section class="feature-head">
+          <h2><span class="eyebrow">03 / TOTP</span>OTP 인증기</h2>
+          <div class="header-actions hidden" id="otp-head-actions">
+            <span class="kbd" id="otp-remain" title="자동 잠금까지 남은 시간"></span>
+            <button id="btn-otp-lock" class="btn btn-ghost btn-sm" title="지금 잠그기"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></button>
+            <button id="btn-otp-add" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>추가</button>
+          </div>
+        </section>
+
+        <!-- 잠금 해제 (자동 로그인과 같은 마스터 비밀번호) -->
+        <section class="card lock-card hidden" id="otp-lock">
+          <div class="card-head">
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><span id="otp-lock-title">잠금 해제</span></h2>
+          </div>
+          <p class="muted hint-text" id="otp-lock-hint"></p>
+          <div class="field-col" id="otp-pw-fields">
+            <input id="otp-pw-old" type="password" autocomplete="off" class="hidden" placeholder="이전 마스터 비밀번호" />
+            <input id="otp-pw" type="password" autocomplete="off" placeholder="마스터 비밀번호" />
+          </div>
+          <p class="err hidden" id="otp-lock-error"></p>
+          <div class="result-actions">
+            <button id="btn-otp-goto-login" class="btn btn-ghost btn-sm hidden">자동 로그인으로 이동</button>
+            <button id="btn-otp-unlock" class="btn btn-primary">잠금 해제</button>
+          </div>
+        </section>
+
+        <section class="hidden otp-main" id="otp-main">
+          <!-- 추가 -->
+          <section class="card hidden" id="otp-add">
+            <div class="card-head">
+              <h2><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>OTP 추가</h2>
+              <button class="btn btn-icon btn-sm" id="btn-otp-add-close" title="닫기"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="otp-add-grid">
+              <button class="btn btn-ghost" data-add="scan" title="현재 탭 화면에 보이는 QR 코드를 읽습니다"><svg class="ic" aria-hidden="true"><use href="#i-scan"/></svg>화면 QR 스캔</button>
+              <button class="btn btn-ghost" data-add="image" title="QR 이 담긴 이미지 파일을 고릅니다 (Ctrl+V 로 붙여넣어도 됩니다)"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg>QR 이미지</button>
+              <button class="btn btn-ghost" data-add="manual"><svg class="ic" aria-hidden="true"><use href="#i-edit"/></svg>직접 입력</button>
+              <button class="btn btn-ghost" data-add="text"><svg class="ic" aria-hidden="true"><use href="#i-paste"/></svg>주소 붙여넣기</button>
+            </div>
+            <p class="muted hint-text otp-add-hint">
+              <b>Google OTP 에서 옮기기</b>: 폰의 Google OTP → ⋮ → <b>계정 내보내기</b> → 나온 QR 을 캡처해 PC 로 보낸 뒤
+              <b>QR 이미지</b>로 고르거나 이 화면에 <span class="kbd">Ctrl+V</span> 로 붙여넣으세요. 계정이 많으면 QR 이 여러 장이에요.
+            </p>
+            <div class="field-col hidden" id="otp-add-manual">
+              <input id="otp-m-issuer" autocomplete="off" spellcheck="false" placeholder="서비스 이름 (예: GitHub)" />
+              <input id="otp-m-account" autocomplete="off" spellcheck="false" placeholder="계정 (예: me@example.com)" />
+              <input id="otp-m-secret" type="password" autocomplete="off" spellcheck="false" placeholder="비밀키 (Base32, 공백 무관)" />
+              <details class="token-box">
+                <summary>고급 — 대부분 기본값 그대로 두면 됩니다</summary>
+                <div class="combine-opts otp-adv">
+                  <label>알고리즘</label>
+                  <select id="otp-m-alg"><option>SHA1</option><option>SHA256</option><option>SHA512</option></select>
+                  <label>자릿수</label>
+                  <select id="otp-m-digits"><option>6</option><option>7</option><option>8</option></select>
+                  <label>주기</label>
+                  <select id="otp-m-period"><option value="30">30초</option><option value="60">60초</option></select>
+                </div>
+              </details>
+              <div class="result-actions">
+                <button id="btn-otp-m-save" class="btn btn-primary btn-sm">저장</button>
+              </div>
+            </div>
+            <div class="field-col hidden" id="otp-add-text">
+              <textarea id="otp-text" rows="3" spellcheck="false" placeholder="otpauth://totp/… 또는 otpauth-migration://offline?data=… (여러 줄 가능)"></textarea>
+              <div class="result-actions">
+                <button id="btn-otp-text-read" class="btn btn-primary btn-sm">읽기</button>
+              </div>
+            </div>
+            <input id="otp-image-file" type="file" accept="image/*" class="hidden" />
+            <p class="err hidden" id="otp-add-error"></p>
+          </section>
+
+          <!-- 가져오기 미리보기 (비밀키는 서비스 워커에만 있다) -->
+          <section class="card hidden" id="otp-preview">
+            <div class="card-head">
+              <h2>가져올 계정 확인</h2>
+              <span class="kbd hidden" id="otp-preview-batch"></span>
+            </div>
+            <div id="otp-preview-list" class="otp-preview-list"></div>
+            <div id="otp-preview-skipped" class="muted hint-text"></div>
+            <div class="result-actions">
+              <button id="btn-otp-preview-cancel" class="btn btn-ghost btn-sm">취소</button>
+              <button id="btn-otp-preview-ok" class="btn btn-primary btn-sm">추가</button>
+            </div>
+          </section>
+
+          <input id="otp-search" placeholder="검색 (서비스·계정)" />
+          <div id="otp-list" class="otp-list"></div>
+          <p class="empty-hint hidden" id="otp-empty">
+            등록된 OTP 가 없습니다.<br /><strong>+ 추가</strong> 를 눌러 QR 을 스캔하거나 Google OTP 에서 가져오세요.
+          </p>
+          <p class="muted warn-text">
+            <svg class="ic ic-inline" aria-hidden="true"><use href="#i-alert"/></svg>OTP 는 <b>이 PC 에만</b> 암호화해 저장합니다(동기화 안 함).
+            비밀번호와 OTP 가 한곳에 있으면 2단계 인증이 약해지니, <b>각 서비스의 복구 코드는 꼭 따로 보관</b>하세요.
+          </p>
+        </section>
+
+        <!-- 항목 수정 (otp.js 가 렌더) -->
+        <section class="card hidden" id="otp-detail"></section>
+      </div>
+
+      <!-- ================= 유니클라우드 2차 인증 (슬랙 DM) ================= -->
       <div class="view hidden" id="view-approval">
         <section class="feature-head">
-          <h2><span class="eyebrow">03 / OTP</span>2차 인증 OTP 가져오기</h2>
+          <h2><span class="eyebrow">04 / UNICLOUD</span>유니클라우드 2차 인증</h2>
         </section>
 
         <section class="card">
@@ -220,7 +324,7 @@
       <!-- ================= 설정 ================= -->
       <div class="view hidden" id="view-settings">
         <section class="feature-head">
-          <h2><span class="eyebrow">04 / SYSTEM</span>설정</h2>
+          <h2><span class="eyebrow">05 / SYSTEM</span>설정</h2>
         </section>
         <!-- 보안 -->
         <section class="card" id="security-card">
@@ -256,6 +360,35 @@
           </div>
         </section>
 
+        <!-- OTP 인증기 보안 -->
+        <section class="card" id="otp-security-card">
+          <div class="card-head">
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-otp"/></svg>보안 <span class="muted">(OTP 인증기)</span></h2>
+            <span class="kbd" id="otp-sec-status">…</span>
+          </div>
+          <div class="combine-opts">
+            <label>자동 잠금</label>
+            <select id="otp-auto-lock">
+              <option value="30">30분</option>
+              <option value="60">1시간</option>
+              <option value="240">4시간</option>
+            </select>
+            <span class="muted otp-set-note">마스터 비밀번호는 자동 로그인과 같고, 잠금은 따로</span>
+          </div>
+          <label class="chk chk-block">
+            <input type="checkbox" id="otp-mask" />
+            <span>코드 가리기<br /><span class="muted">마우스를 올리거나 포커스했을 때만 숫자를 보여 줍니다</span></span>
+          </label>
+          <label class="chk chk-block otp-set-gap">
+            <input type="checkbox" id="otp-clear-clip" />
+            <span>복사한 코드 30초 뒤 클립보드에서 지우기<br /><span class="muted">그 사이 다른 것을 복사했으면 건드리지 않습니다</span></span>
+          </label>
+          <p class="muted warn-text">
+            저장 위치: <b>이 PC 에만</b> (동기화하지 않음). 다른 PC 에서는 따로 등록하거나 백업 파일로 옮기세요.
+            비밀키를 볼 때는 매번 마스터 비밀번호를 다시 입력합니다.
+          </p>
+        </section>
+
         <!-- 동기화 -->
         <section class="card">
           <div class="card-head">
@@ -278,7 +411,7 @@
             <h2><svg class="ic" aria-hidden="true"><use href="#i-archive"/></svg>백업</h2>
           </div>
           <p class="muted hint-text">
-            자동 로그인 사이트·계정(비밀번호는 <b>암호화된 그대로</b>)과 텍스트 추출 규칙·프리셋을 파일로 옮깁니다.
+            자동 로그인 사이트·계정과 OTP 인증기(둘 다 <b>암호화된 그대로</b>), 텍스트 추출 규칙·프리셋을 파일로 옮깁니다.
             가져온 뒤에는 백업할 때의 <b>마스터 비밀번호</b>로 잠금을 해제하세요.
           </p>
           <div class="result-actions">

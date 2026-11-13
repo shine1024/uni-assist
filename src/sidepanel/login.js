@@ -874,6 +874,7 @@ function bindStaticEvents() {
 
   $("#btn-lock-now").addEventListener("click", async () => {
     await vault.lock();
+    await chrome.runtime.sendMessage({ type: "OTP_LOCK" }).catch(() => {}); // 설정의 「지금 잠그기」는 OTP 도 함께
     toast("잠갔습니다");
     await refreshAll();
   });
@@ -917,7 +918,12 @@ function bindStaticEvents() {
     if (nw !== nw2) return show("새 비밀번호가 일치하지 않습니다");
     try {
       const r = await vault.changeMaster(oldPw, nw);
-      toast(`변경 완료 (비밀번호 ${r.reencrypted}건 재암호화)`);
+      // OTP 인증기는 같은 마스터 비밀번호로 감싼 별도 키를 쓴다 → 새 비밀번호로 다시 감싼다(항목 재암호화 없음)
+      const o = await chrome.runtime
+        .sendMessage({ type: "OTP_REWRAP", oldPassword: oldPw, newPassword: nw })
+        .catch(() => null);
+      const otpNote = o && o.result === "done" ? " · OTP 키도 옮김" : "";
+      toast(`변경 완료 (비밀번호 ${r.reencrypted}건 재암호화${otpNote})`);
       $("#change-master-form").classList.add("hidden");
     } catch (e) {
       return show(e.message);
