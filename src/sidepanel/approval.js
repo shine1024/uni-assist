@@ -9,6 +9,7 @@ const K_SLACK = "ua_slack"; // background/approval.js 와 같은 키
 
 let current = null; // { code, ts }
 let waiting = null; // { cancelled }
+let autoMode = false; // 「자동 입력」 체크박스. 켜면 번호를 받자마자 현재 탭에 입력, 끄면 복사 / 입력 후 확인을 직접 고른다
 
 // ---- 슬랙 연결 ------------------------------------------------------------
 
@@ -29,6 +30,17 @@ async function refreshStatus() {
   $("#slack-token-box").classList.toggle("hidden", st.connected);
   $("#otp-autofill").checked = st.autoFill;
   $("#otp-autofill").disabled = !st.connected;
+  autoMode = !!st.autoFill;
+  applyMode();
+}
+
+/** 자동/수동에 맞게 버튼 이름과 안내를 바꾼다. */
+function applyMode() {
+  if (!waiting) $("#btn-approval-otp").textContent = autoMode ? "인증번호 자동 입력" : "인증번호 확인";
+  $("#approval-otp-mode").textContent = autoMode
+    ? "자동: 포털 인증 화면이 뜨면 알아서 입력합니다. 버튼을 누르면 번호를 받자마자 현재 탭에 넣고 확인을 누릅니다."
+    : "수동: 번호를 받아 보여 줍니다. 복사하거나 「입력 후 확인」으로 현재 탭에 넣으세요.";
+  $("#btn-approval-otp-fill").textContent = autoMode ? "다시 입력" : "입력 후 확인";
 }
 
 let configured = false;
@@ -168,7 +180,7 @@ function setInfo(text, isError = false) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 아직 쓰지 않은 인증번호를 찾는다. 없으면 메일이 올 때까지 최대 3분 기다린다. 다시 누르면 취소. */
+/** 아직 쓰지 않은 인증번호를 찾는다(자동이면 받자마자 현재 탭에 입력). 없으면 메일이 올 때까지 최대 3분 기다린다. 다시 누르면 취소. */
 async function checkOtp() {
   const button = $("#btn-approval-otp");
   if (waiting) {
@@ -184,6 +196,7 @@ async function checkOtp() {
 
   const startedAt = Date.now();
   const oldest = Math.floor(startedAt / 1000) - APPROVAL_CONFIG.lookbackSec;
+  const usedAtStart = await lastUsedTs();
   try {
     for (;;) {
       const left = Math.ceil((APPROVAL_CONFIG.waitMs - (Date.now() - startedAt)) / 1000);
@@ -202,8 +215,15 @@ async function checkOtp() {
         current = { code: r.code, ts: r.ts };
         $("#approval-otp-code").textContent = r.code;
         $("#approval-otp-code").classList.remove("hidden");
-        $("#approval-otp-actions").classList.remove("hidden");
         setInfo(describeReceivedAt(r.receivedAt));
+        // 자동이면 바로 현재 탭에 넣고 확인을 누른다. 수동이거나 입력에 실패하면 복사 / 입력 버튼을 보여 준다.
+        const filled = autoMode && (await fillOtp());
+        $("#approval-otp-actions").classList.toggle("hidden", filled);
+        return;
+      }
+      // 기다리는 사이 포털 화면(자동 입력)이 먼저 번호를 써 버렸으면 더 기다리지 않는다.
+      if ((await lastUsedTs()) > usedAtStart) {
+        setInfo("포털 화면에서 인증번호를 자동으로 입력했어요");
         return;
       }
       await sleep(APPROVAL_CONFIG.pollIntervalMs);
@@ -216,8 +236,13 @@ async function checkOtp() {
     setInfo(messageForError(err), true);
   } finally {
     waiting = null;
-    button.textContent = "인증번호 확인";
+    applyMode();
   }
+}
+
+async function lastUsedTs() {
+  const { [K_SLACK]: s } = await chrome.storage.local.get(K_SLACK);
+  return parseFloat((s && s.lastUsedTs) || "0") || 0;
 }
 
 const markUsed = () =>
@@ -250,8 +275,9 @@ async function copyOtp() {
   copyLabelTimer = setTimeout(() => (label.textContent = "복사"), 1500);
 }
 
+/** 현재 탭에 입력하고 확인을 누른다. 성공하면 true. */
 async function fillOtp() {
-  if (!current) return;
+  if (!current) return false;
   const button = $("#btn-approval-otp-fill");
   button.disabled = true;
   const result = await chrome.runtime
@@ -260,10 +286,13 @@ async function fillOtp() {
   button.disabled = false;
   if (result && result.ok) {
     markUsed();
-    showFillResult("입력하고 확인 버튼을 눌렀어요", false);
-  } else {
-    showFillResult((result && result.message) || "입력하지 못했어요", true);
+    showFillResult("인증번호를 입력하고 확인 버튼을 눌렀어요", false);
+    $("#approval-otp-actions").classList.add("hidden");
+    return true;
   }
+  const why = (result && result.message) || "입력하지 못했어요";
+  showFillResult(autoMode ? `${why} — 인증 화면을 연 뒤 「다시 입력」을 누르거나 복사해 쓰세요` : why, true);
+  return false;
 }
 
 export function initApprovalUI() {

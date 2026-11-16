@@ -7,6 +7,8 @@ const $ = (selector) => document.querySelector(selector);
 
 let current = null; // { code }
 let waiting = null; // { cancelled }
+let autoMode = false; // 「자동 입력」 체크박스. 켜면 코드를 받자마자 claude.ai 탭에 입력, 끄면 복사 / 입력 후 확인을 직접 고른다
+const K_CLAUDE = "ua_claude_login"; // background/claude-login.js 와 같은 키
 
 async function refreshStatus() {
   const st = await chrome.runtime.sendMessage({ type: "CLAUDE_STATUS" }).catch(() => null);
@@ -16,6 +18,21 @@ async function refreshStatus() {
   $("#btn-claude-goto-slack").classList.toggle("hidden", st.connected);
   $("#claude-autofill").checked = st.autoFill;
   $("#claude-autofill").disabled = !st.connected;
+  autoMode = !!st.autoFill;
+  applyMode();
+}
+
+/** 자동/수동에 맞게 안내와 버튼 이름을 바꾼다. */
+function applyMode() {
+  $("#claude-mode").textContent = autoMode
+    ? "자동: claude.ai 인증 화면이 뜨면 알아서 로그인합니다. 링크가 코드를 보여 주면 받자마자 claude.ai 탭에 넣고 확인을 누릅니다."
+    : "수동: 링크가 코드를 보여 주면 코드를 표시합니다. 복사하거나 「입력 후 확인」으로 claude.ai 탭에 넣으세요.";
+  $("#btn-claude-fill").textContent = autoMode ? "다시 입력" : "입력 후 확인";
+}
+
+async function lastUsedTs() {
+  const { [K_CLAUDE]: s } = await chrome.storage.local.get(K_CLAUDE);
+  return parseFloat((s && s.lastUsedTs) || "0") || 0;
 }
 
 function setInfo(text, isError = false) {
@@ -42,7 +59,7 @@ function describeReceivedAt(iso) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 아직 쓰지 않은 보안 링크 메일을 찾아 코드를 읽는다. 없으면 최대 3분 기다린다. 다시 누르면 취소. */
+/** 아직 쓰지 않은 보안 링크 메일을 찾아 로그인한다(코드가 나오면 자동일 때 바로 입력). 없으면 최대 3분 기다린다. 다시 누르면 취소. */
 async function fetchCode() {
   const button = $("#btn-claude-fetch");
   if (waiting) {
@@ -70,6 +87,7 @@ async function fetchCode() {
   const ticker = setInterval(showCountdown, 1000);
   const stopTicker = () => clearInterval(ticker);
   job.stop = stopTicker;
+  const usedAtStart = await lastUsedTs();
   try {
     for (;;) {
       if (leftSec() <= 0) {
@@ -100,8 +118,16 @@ async function fetchCode() {
         current = { code: r.code };
         $("#claude-code").textContent = r.code;
         $("#claude-code").classList.remove("hidden");
-        $("#claude-actions").classList.remove("hidden");
         setInfo(describeReceivedAt(r.receivedAt));
+        // 자동이면 바로 claude.ai 탭에 넣고 확인을 누른다. 수동이거나 입력에 실패하면 복사 / 입력 버튼을 보여 준다.
+        const filled = autoMode && (await fillCode());
+        $("#claude-actions").classList.toggle("hidden", filled);
+        return;
+      }
+      // 기다리는 사이 claude.ai 화면(자동 입력)이 먼저 메일을 써 버렸으면 더 기다리지 않는다.
+      if ((await lastUsedTs()) > usedAtStart) {
+        stopTicker();
+        setInfo("claude.ai 화면에서 보안 링크로 자동 로그인했어요");
         return;
       }
       await sleep(CFG.pollIntervalMs);
@@ -145,14 +171,21 @@ async function copyCode() {
   copyLabelTimer = setTimeout(() => (label.textContent = "복사"), 1500);
 }
 
+/** claude.ai 탭에 입력하고 「이메일 주소 확인」을 누른다. 성공하면 true. */
 async function fillCode() {
-  if (!current) return;
+  if (!current) return false;
   const button = $("#btn-claude-fill");
   button.disabled = true;
   const result = await chrome.runtime.sendMessage({ type: "CLAUDE_FILL_CODE", code: current.code }).catch(() => null);
   button.disabled = false;
-  if (result && result.ok) showResult("입력하고 「이메일 주소 확인」을 눌렀어요", false);
-  else showResult((result && result.message) || "입력하지 못했어요", true);
+  if (result && result.ok) {
+    showResult("입력하고 「이메일 주소 확인」을 눌렀어요", false);
+    $("#claude-actions").classList.add("hidden");
+    return true;
+  }
+  const why = (result && result.message) || "입력하지 못했어요";
+  showResult(autoMode ? `${why} — claude.ai 인증 화면을 연 뒤 「다시 입력」을 누르거나 복사해 쓰세요` : why, true);
+  return false;
 }
 
 async function runDiagnosis() {
