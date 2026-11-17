@@ -96,6 +96,31 @@ export function findMatchingSites(url, sites) {
     .sort((a, b) => normalizePath(b.path).length - normalizePath(a.path).length);
 }
 
+/** 경로의 첫 구간 = 컨텍스트 패스 (`/redmine/login` → `redmine`, 루트 → "") */
+export function contextPath(path) {
+  return normalizePath(path).split("/")[1] || "";
+}
+
+/**
+ * 같은 origin 에 여러 앱(예: `/redmine`, `/uniworks`)이 등록된 경우 현재 탭의 앱만 남긴다.
+ * '경로까지 일치'가 꺼져 있어도 컨텍스트 패스(첫 경로 구간)는 구분한다.
+ *   1) 컨텍스트 패스가 같은 사이트가 있으면 → 그것만
+ *   2) 없으면 → 컨텍스트 패스 없이(루트로) 등록된 사이트만
+ *   3) 그것도 없으면 → 그대로 (선택창에서 고르게)
+ * 입력 순서는 유지한다.
+ */
+export function narrowByContextPath(url, sites) {
+  const list = Array.isArray(sites) ? sites : [];
+  if (list.length < 2) return list;
+  const t = parseTarget(url);
+  if (!t.ok) return list;
+  const ctx = contextPath(t.path);
+  const same = ctx ? list.filter((s) => contextPath(s.path) === ctx) : [];
+  if (same.length) return same;
+  const root = list.filter((s) => contextPath(s.path) === "");
+  return root.length ? root : list;
+}
+
 /** 현재 URL이 HTTPS 다운그레이드 때문에 막힌 사이트들 */
 export function findDowngradedSites(url, sites) {
   const list = Array.isArray(sites) ? sites : [];

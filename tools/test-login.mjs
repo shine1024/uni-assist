@@ -23,6 +23,7 @@ import {
   isDowngrade,
   isLoginHotkeyTarget,
   isValidSelector,
+  narrowByContextPath,
   normalizePath,
   parseTarget,
   pathMatches,
@@ -143,6 +144,23 @@ eq(
   "경로가 긴 사이트가 먼저"
 );
 eq(findMatchingSites("https://zzz.com/", [siteOrigin, sitePath]).length, 0, "일치 없음");
+
+console.log("login-match: narrowByContextPath (같은 도메인의 여러 앱 구분)");
+{
+  const rm = { id: "rm", origin: "https://h.com", path: "/redmine/login", matchPath: false };
+  const uw = { id: "uw", origin: "https://h.com", path: "/uniworks/login.do", matchPath: false };
+  const root = { id: "root", origin: "https://h.com", path: "/", matchPath: false };
+  const ids = (l) => l.map((s) => s.id);
+  eq(ids(narrowByContextPath("https://h.com/redmine/my/page", [rm, uw])), ["rm"], "레드마인 탭 → 레드마인만");
+  eq(ids(narrowByContextPath("https://h.com/uniworks/main.do", [rm, uw])), ["uw"], "UniWORKS 탭 → UniWORKS만");
+  eq(ids(narrowByContextPath("https://h.com/REDMINE/x", [rm, uw])), ["rm", "uw"], "대소문자 다르면 구분 안 함 → 전부");
+  eq(ids(narrowByContextPath("https://h.com/main.do", [rm, root])), ["root"], "컨텍스트 없는 페이지 → 루트 등록 사이트");
+  eq(ids(narrowByContextPath("https://h.com/other/x", [rm, root])), ["root"], "일치 없음 → 루트 등록 사이트");
+  eq(ids(narrowByContextPath("https://h.com/other/x", [rm, uw])), ["rm", "uw"], "일치·루트 모두 없음 → 그대로");
+  eq(ids(narrowByContextPath("https://h.com/redmine", [rm, { ...rm, id: "rm2" }])), ["rm", "rm2"], "같은 앱 여러 개 → 모두 유지");
+  eq(ids(narrowByContextPath("https://h.com/redmine", [uw])), ["uw"], "후보 하나면 그대로");
+  eq(narrowByContextPath("chrome://x", [rm, uw]).length, 2, "지원하지 않는 주소 → 그대로");
+}
 
 console.log("login-match: isLoginHotkeyTarget (F2 는 등록된 사이트에서만)");
 {

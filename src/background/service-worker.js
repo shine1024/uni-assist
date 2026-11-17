@@ -14,6 +14,7 @@ import {
   findOriginMatchingSites,
   isLoginHotkeyTarget,
   logoutCandidates,
+  narrowByContextPath,
   toMatchPatterns,
 } from "../lib/login-match.js";
 import { getSettings, loadSites } from "../lib/login-store.js";
@@ -261,9 +262,10 @@ async function runAutoLogin(opts = {}) {
     const enabled = (list) => list.filter((s) => s.autoLogin !== false);
 
     // 로그인: origin + 경로까지 엄격하게 (로그인 페이지를 경로로 구분할 수 있어야 하므로)
-    const matches = enabled(byId(findMatchingSites(url, sites)));
+    // 같은 도메인에 여러 앱이 있으면 컨텍스트 패스(/redmine 등)가 같은 사이트만 남긴다
+    const matches = narrowByContextPath(url, enabled(byId(findMatchingSites(url, sites))));
     // 로그아웃: origin 만 일치하면 된다 — 로그인한 경로와 로그아웃하는 경로는 보통 다르다
-    const originMatches = enabled(byId(findOriginMatchingSites(url, sites)));
+    const originMatches = narrowByContextPath(url, enabled(byId(findOriginMatchingSites(url, sites))));
 
     if (!matches.length && !originMatches.length) {
       const blocked = findDowngradedSites(url, sites);
