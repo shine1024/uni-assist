@@ -388,10 +388,16 @@
               <option value="60">1시간</option>
               <option value="240">4시간</option>
               <option value="480">8시간</option>
+              <option value="never">잠그지 않음 (이 PC 기억)</option>
             </select>
             <button id="btn-lock-now" class="btn btn-ghost btn-sm">지금 잠그기</button>
           </div>
 
+          <p class="muted warn-text hidden" id="never-lock-note">
+            <b>이 PC 에서는 잠그지 않습니다.</b> 브라우저를 다시 켜도 마스터 비밀번호를 묻지 않아요.
+            이 설정은 이 PC 에만 적용되고, 잠금 해제 키는 이 PC 에만 저장됩니다(동기화·백업하지 않음).
+            「지금 잠그기」를 누르면 다음 한 번은 다시 입력합니다.
+          </p>
           <div class="result-actions">
             <button id="btn-toggle-change-master" class="btn btn-ghost btn-sm">마스터 비밀번호 변경…</button>
           </div>
@@ -422,6 +428,7 @@
               <option value="30">30분</option>
               <option value="60">1시간</option>
               <option value="240">4시간</option>
+              <option value="never">잠그지 않음 (이 PC 기억)</option>
             </select>
             <span class="muted otp-set-note">마스터 비밀번호는 자동 로그인과 같고, 잠금은 따로</span>
           </div>
@@ -475,6 +482,7 @@
         <section class="shortcut card">
           <div class="card-head">
             <h2><svg class="ic" aria-hidden="true"><use href="#i-keyboard"/></svg>단축키</h2>
+            <span class="kbd" id="hotkey-os">…</span>
           </div>
           <p class="muted hint-text">「키 지정」을 누르고 원하는 키를 누르세요. <code>F2</code> 처럼 수정자 없는 키도 됩니다.</p>
           <ul class="kv">

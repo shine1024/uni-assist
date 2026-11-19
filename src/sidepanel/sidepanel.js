@@ -8,7 +8,7 @@ import { initApprovalUI, onApprovalShown } from "./approval.js";
 import { initClaudeUI, onClaudeShown } from "./claude-login.js";
 import { initBackupUI } from "./backup.js";
 import { initOtpUI, onOtpShown } from "./otp.js";
-import { DEFAULT_COPY_COMBO, DEFAULT_PANEL_COMBO, comboFromEvent, isTypingTarget, needsTypingGuard, normalizeHotkey } from "../lib/hotkey.js";
+import { comboFromEvent, isMacPlatform, isTypingTarget, needsTypingGuard, readHotkeys } from "../lib/hotkey.js";
 import { K_SETTINGS } from "../lib/login-store.js";
 import { K_NAV_ORDER, moveItem, normalizeOrder } from "../lib/nav-order.js";
 import {
@@ -533,11 +533,10 @@ function toast(msg) {
 // 패널에 포커스가 있으면 키 입력이 페이지로 가지 않아 콘텐츠 스크립트(hotkey.js)가 받지 못한다.
 // 패널 문서에서 같은 키를 받아 직접 처리한다. (키 지정 중에는 login.js 가 캡처 단계에서 먼저 가로챈다)
 (function panelHotkeys() {
-  let hotkey = normalizeHotkey(null, DEFAULT_PANEL_COMBO);
-  let copyHotkey = normalizeHotkey(null, DEFAULT_COPY_COMBO);
+  const isMac = isMacPlatform();
+  let { panel: hotkey, copy: copyHotkey } = readHotkeys(null, isMac);
   const apply = (s) => {
-    hotkey = normalizeHotkey(s && s.panelHotkey, DEFAULT_PANEL_COMBO);
-    copyHotkey = normalizeHotkey(s && s.copyHotkey, DEFAULT_COPY_COMBO);
+    ({ panel: hotkey, copy: copyHotkey } = readHotkeys(s, isMac));
   };
   chrome.storage.sync.get(K_SETTINGS).then((bag) => apply(bag[K_SETTINGS]));
   chrome.storage.onChanged.addListener((changes, area) => {

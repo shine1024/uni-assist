@@ -5,6 +5,7 @@
 // 예외: 직접 입력한 비밀키(저장 즉시 입력칸을 비움), 「비밀키 보기」 응답(30초 뒤 화면에서 지움).
 import { icon } from "./icons.js";
 import { K_OTP_SETTINGS } from "../lib/otp-store.js";
+import { NEVER_LOCK } from "../lib/device-prefs.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -75,7 +76,9 @@ function renderLock() {
   } else {
     $("#otp-lock-title").textContent = st.initialized ? "잠금 해제" : "OTP 인증기 시작";
     $("#otp-lock-hint").innerHTML = st.initialized
-      ? `자동 로그인과 같은 마스터 비밀번호를 입력하세요. <b>${st.settings.autoLockMinutes}분</b> 뒤 자동으로 잠깁니다.`
+      ? st.neverLock
+        ? "자동 로그인과 같은 마스터 비밀번호를 입력하세요. 이 PC 에서는 <b>직접 잠글 때까지</b> 다시 묻지 않습니다."
+        : `자동 로그인과 같은 마스터 비밀번호를 입력하세요. <b>${st.settings.autoLockMinutes}분</b> 뒤 자동으로 잠깁니다.`
       : "자동 로그인의 마스터 비밀번호를 입력하면 OTP 전용 암호화 키를 만들고 시작합니다.";
     $("#otp-pw").placeholder = "마스터 비밀번호";
     $("#btn-otp-unlock").textContent = st.initialized ? "잠금 해제" : "시작";
@@ -202,6 +205,8 @@ function tickTimers() {
   if (st && st.expiresAt) {
     const ms = st.expiresAt - now;
     $("#otp-remain").textContent = ms > 0 ? `${Math.ceil(ms / 60000)}분` : "";
+  } else if (st && st.unlocked) {
+    $("#otp-remain").textContent = "이 PC 기억";
   }
 }
 
@@ -517,14 +522,16 @@ async function deleteItem(id, fromDetail) {
 function renderSettings() {
   if (!st || !st.ok) return;
   const s = st.settings;
-  $("#otp-auto-lock").value = String(s.autoLockMinutes);
+  $("#otp-auto-lock").value = st.neverLock ? NEVER_LOCK : String(s.autoLockMinutes);
   $("#otp-mask").checked = s.maskCodes;
   $("#otp-clear-clip").checked = s.clearClipboard;
   const ms = st.expiresAt - Date.now();
   $("#otp-sec-status").textContent = !st.initialized
     ? "미설정"
     : st.unlocked
-      ? `해제됨 · ${Math.max(1, Math.ceil(ms / 60000))}분 남음`
+      ? st.expiresAt
+        ? `해제됨 · ${Math.max(1, Math.ceil(ms / 60000))}분 남음`
+        : "해제됨 · 이 PC 기억"
       : "잠김";
 }
 
@@ -609,7 +616,16 @@ export function initOtpUI(deps) {
   });
   document.addEventListener("paste", onPaste);
 
-  $("#otp-auto-lock").addEventListener("change", (e) => saveSetting({ autoLockMinutes: Number(e.target.value) }));
+  $("#otp-auto-lock").addEventListener("change", async (e) => {
+    const never = e.target.value === NEVER_LOCK;
+    await chrome.runtime.sendMessage({ type: "OTP_SET_NEVER_LOCK", on: never }).catch(() => {});
+    if (never) {
+      toast("이 PC 에서는 OTP 인증기를 잠그지 않아요");
+      refresh();
+    } else {
+      saveSetting({ autoLockMinutes: Number(e.target.value) });
+    }
+  });
   $("#otp-mask").addEventListener("change", (e) => saveSetting({ maskCodes: e.target.checked }));
   $("#otp-clear-clip").addEventListener("change", (e) => saveSetting({ clearClipboard: e.target.checked }));
 

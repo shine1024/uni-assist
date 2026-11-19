@@ -18,6 +18,7 @@ import {
   toMatchPatterns,
 } from "../lib/login-match.js";
 import { getSettings, loadSites } from "../lib/login-store.js";
+import { isMacPlatform, readHotkeys } from "../lib/hotkey.js";
 import * as vault from "../lib/vault.js";
 import { isExtensionPage } from "../lib/approval-flow.js";
 import {
@@ -589,10 +590,8 @@ async function syncHotkeyRegistration() {
   let patterns = [];
   try {
     const [sites, settings] = await Promise.all([loadSites(), getSettings()]);
-    const authOn = settings.hotkey && settings.hotkey.enabled !== false;
-    const panelOn = settings.panelHotkey && settings.panelHotkey.enabled !== false;
-    const copyOn = settings.copyHotkey && settings.copyHotkey.enabled !== false;
-    if (authOn || panelOn || copyOn) {
+    const hk = readHotkeys(settings, isMacPlatform()); // 이 PC 운영체제의 단축키만 본다
+    if (hk.auth.enabled || hk.panel.enabled || hk.copy.enabled) {
       // 패널 토글(F4)은 어디서든 쓰고 싶은 기능이라 기본은 모든 http(s) 페이지.
       // 끄면 등록된 로그인 사이트 + 텍스트 추출 규칙이 있는 사이트에만 리스너를 심는다(범위 최소화).
       if (settings.hotkeyAllSites === false) {

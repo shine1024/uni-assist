@@ -61,7 +61,8 @@ function makeArea({ perItem = Infinity, total = Infinity, maxItems = Infinity } 
 
 const sync = makeArea({ perItem: QUOTA_BYTES_PER_ITEM, total: QUOTA_BYTES, maxItems: MAX_ITEMS });
 const session = makeArea();
-globalThis.chrome = { storage: { sync, session } };
+const local = makeArea();
+globalThis.chrome = { storage: { sync, session, local } };
 
 // 가짜 chrome 을 먼저 설치한 뒤에 모듈을 읽어야 한다
 const store = await import("../src/lib/login-store.js");
@@ -277,6 +278,53 @@ eq(await store.hasAnyLoginData(), true, "인덱스 없이 사이트 항목만 �
 sync.data.clear();
 eq(await vault.initVault("fresh-master-1234"), true, "깨끗한 상태에서는 최초 설정 성공");
 eq(await vault.isInitialized(), true, "금고 생성됨");
+
+// ---- 잠그지 않음 (이 PC 기억) -------------------------------------------
+console.log("vault: 잠그지 않음 (이 PC 기억)");
+const devicePrefs = await import("../src/lib/device-prefs.js");
+const PW = "fresh-master-1234";
+eq((await vault.status()).neverLock, false, "기본은 시간 잠금");
+eq(local.data.has(devicePrefs.L_VAULT_KEY), false, "기본은 디스크(local)에 키를 두지 않음");
+
+await vault.setNeverLock(true);
+eq(local.data.has(devicePrefs.L_VAULT_KEY), true, "풀린 상태에서 켜면 바로 이 PC 에 기억");
+eq(sync.data.has(devicePrefs.L_VAULT_KEY), false, "기억한 키는 동기화 저장소에 없음");
+let nst = await vault.status();
+eq([nst.neverLock, nst.unlocked, nst.expiresAt], [true, true, 0], "상태: 이 PC 기억 · 해제 · 만료 없음");
+
+session.data.clear(); // 브라우저를 껐다 켠 것과 같음
+eq((await vault.getUnlockedKey()) !== null, true, "브라우저 재시작 뒤에도 잠금 해제 유지");
+eq((await vault.status()).unlocked, true, "재시작 뒤 상태도 해제");
+
+await vault.lock();
+eq(local.data.has(devicePrefs.L_VAULT_KEY), false, "지금 잠그기 → 기억한 키 삭제");
+eq(await vault.getUnlockedKey(), null, "지금 잠그기 → 잠김");
+eq((await vault.status()).neverLock, true, "옵션은 그대로 유지");
+eq(await vault.unlock(PW), true, "다시 잠금 해제");
+eq(local.data.has(devicePrefs.L_VAULT_KEY), true, "옵션이 켜져 있으면 잠금 해제 때 다시 기억");
+
+// 다른 PC 에서 마스터 비밀번호를 바꿨다 → 동기화로 금고 검증자가 바뀜 → 이 PC 의 기억은 무효
+const vmeta = await store.getVaultMeta();
+await store.setVaultMeta({ ...vmeta, verifier: "다른-PC-에서-바뀐-검증자" });
+session.data.clear();
+eq(await vault.getUnlockedKey(), null, "금고가 바뀌면 기억한 키를 쓰지 않음");
+eq(local.data.has(devicePrefs.L_VAULT_KEY), false, "바뀐 금고의 기억은 삭제");
+await store.setVaultMeta(vmeta);
+
+eq(await vault.unlock(PW), true, "잠금 해제");
+await vault.setNeverLock(false);
+eq(local.data.has(devicePrefs.L_VAULT_KEY), false, "옵션 끄기 → 기억한 키 삭제");
+nst = await vault.status();
+eq([nst.neverLock, nst.unlocked, nst.expiresAt > Date.now()], [false, true, true], "끈 뒤에도 바로 잠기지 않고 시간 잠금으로 이어짐");
+session.data.clear();
+eq(await vault.getUnlockedKey(), null, "끈 뒤에는 브라우저 재시작 시 잠김");
+
+const r2 = await vault.unlock(PW);
+await vault.setNeverLock(true);
+const NEW2 = "another-master-5555";
+await vault.changeMaster(PW, NEW2);
+session.data.clear();
+eq(r2 && (await vault.getUnlockedKey()) !== null, true, "이 PC 에서 마스터를 바꾸면 새 키로 다시 기억");
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

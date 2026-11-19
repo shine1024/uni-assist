@@ -3,10 +3,14 @@ import {
   DEFAULT_COMBO,
   DEFAULT_COPY_COMBO,
   DEFAULT_PANEL_COMBO,
+  PLATFORM_DEFAULTS,
   comboFromEvent,
   displayCombo,
   hotkeyConflict,
+  hotkeySettingKey,
   isFunctionCombo,
+  isMacPlatform,
+  readHotkeys,
   isTypingTarget,
   needsTypingGuard,
   normalizeHotkey,
@@ -34,8 +38,9 @@ function eq(actual, expected, label) {
 }
 
 // keydown 이벤트 흉내
-const ev = (key, mods = {}) => ({
+const ev = (key, mods = {}, code = "") => ({
   key,
+  code,
   ctrlKey: !!mods.ctrl,
   altKey: !!mods.alt,
   shiftKey: !!mods.shift,
@@ -54,6 +59,31 @@ eq(comboFromEvent(ev("Control", { ctrl: true })), null, "수정자만 누른 상
 eq(comboFromEvent(ev("Shift", { shift: true })), null, "Shift 단독도 조합 아님");
 // 같은 물리 조합은 항상 같은 문자열 → 저장/비교가 단순해진다
 eq(comboFromEvent(ev("F2")) === comboFromEvent(ev("F2")), true, "같은 입력 → 같은 문자열");
+
+console.log("hotkey: 물리 키(e.code) 기준 — Mac Option·한글 입력");
+eq(comboFromEvent(ev("¬", { ctrl: true, alt: true }, "KeyL")), "Ctrl+Alt+L", "Mac ⌃⌥L: key 가 특수문자여도 L");
+eq(comboFromEvent(ev("Dead", { alt: true }, "KeyE")), "Alt+E", "Mac ⌥E: key 가 Dead 여도 E");
+eq(comboFromEvent(ev("ㅣ", { ctrl: true, alt: true }, "KeyL")), "Ctrl+Alt+L", "한글 입력 상태 ㅣ → L");
+eq(comboFromEvent(ev("Process", { ctrl: true, shift: true }, "KeyY")), "Ctrl+Shift+Y", "IME 조합 중(Process) → Y");
+eq(comboFromEvent(ev("¡", { alt: true }, "Digit1")), "Alt+1", "숫자도 물리 키로");
+eq(comboFromEvent(ev("F2", {}, "F2")), "F2", "기능키는 그대로");
+eq(comboFromEvent(ev("Control", { ctrl: true }, "ControlLeft")), null, "수정자 단독은 여전히 조합 아님");
+
+console.log("hotkey: 운영체제별 단축키");
+eq(isMacPlatform({ platform: "MacIntel" }), true, "MacIntel → Mac");
+eq(isMacPlatform({ userAgentData: { platform: "macOS" } }), true, "userAgentData macOS → Mac");
+eq(isMacPlatform({ platform: "Win32" }), false, "Win32 → Mac 아님");
+eq(isMacPlatform(null), false, "navigator 없음 → Mac 아님");
+eq(hotkeySettingKey("auth", false), "hotkey", "Windows 는 기존 키 그대로(마이그레이션 불필요)");
+eq(hotkeySettingKey("panel", true), "panelHotkeyMac", "Mac 은 Mac 접미사");
+const defWin = readHotkeys({}, false);
+const defMac = readHotkeys({}, true);
+eq([defWin.auth.combo, defWin.panel.combo, defWin.copy.combo], ["F2", "F4", "Ctrl+Shift+Y"], "Windows 기본값");
+eq([defMac.auth.combo, defMac.panel.combo, defMac.copy.combo], ["Ctrl+Alt+L", "Ctrl+Alt+P", "Ctrl+Alt+C"], "Mac 기본값");
+const mixed = { hotkey: { combo: "F9", enabled: false }, hotkeyMac: { combo: "Ctrl+Alt+K", enabled: true } };
+eq(readHotkeys(mixed, false).auth, { combo: "F9", enabled: false }, "Windows 는 Windows 값만");
+eq(readHotkeys(mixed, true).auth, { combo: "Ctrl+Alt+K", enabled: true }, "Mac 은 Mac 값만 (Windows 에서 끈 것도 영향 없음)");
+eq(new Set(Object.values(PLATFORM_DEFAULTS.mac)).size, 3, "Mac 기본값끼리 겹치지 않음");
 
 console.log("hotkey: normalizeHotkey");
 eq(normalizeHotkey(undefined), { combo: "F2", enabled: true }, "기본값 F2 / 사용 ON");
@@ -89,6 +119,10 @@ console.log("hotkey: 표기");
 eq(displayCombo("Meta+L", true), "⌘L", "Mac 에서 Meta → ⌘");
 eq(displayCombo("Alt+L", true), "⌥L", "Mac 에서 Alt → ⌥");
 eq(displayCombo("Alt+L", false), "Alt+L", "그 외는 그대로");
+eq(displayCombo("Ctrl+Alt+L", true), "⌃⌥L", "Mac ⌃⌥L");
+eq(displayCombo("Ctrl+Shift+Y", true), "⌃⇧Y", "Mac ⌃⇧Y");
+eq(displayCombo("F2", true), "F2", "Mac 기능키는 그대로");
+eq(displayCombo("Ctrl++", true), "⌃+", "+ 키도 깨지지 않음");
 
 console.log("login-match: 콘텐츠 스크립트 매치 패턴");
 const root = { id: "a", origin: "https://a.com", path: "/", matchPath: false };
@@ -117,10 +151,19 @@ const start = src.indexOf("// ---- ../lib/hotkey.js");
 const end = src.search(/\n\s*\/\/ -{40,}/);
 eq(start > 0 && end > start, true, "복제 구간 마커를 찾음");
 const dup = new Function(
-  `${modLine}\n${src.slice(start, end)}\nreturn { comboFromEvent, isTypingTarget, needsTypingGuard };`
+  `${modLine}\n${src.slice(start, end)}\nreturn { comboFromEvent, isTypingTarget, needsTypingGuard, PLATFORM_DEFAULTS, isMacPlatform, readHotkeys };`
 )();
 
-const cases = [ev("F2"), ev("l"), ev("L", { shift: true }), ev("2", { ctrl: true, alt: true }), ev(" "), ev("Control", { ctrl: true })];
+const cases = [
+  ev("F2"),
+  ev("l"),
+  ev("L", { shift: true }),
+  ev("2", { ctrl: true, alt: true }),
+  ev(" "),
+  ev("Control", { ctrl: true }),
+  ev("¬", { ctrl: true, alt: true }, "KeyL"),
+  ev("Process", { ctrl: true }, "Digit3"),
+];
 eq(
   cases.map((c) => dup.comboFromEvent(c)),
   cases.map((c) => comboFromEvent(c)),
@@ -135,6 +178,17 @@ eq(
   [{ tagName: "INPUT" }, { tagName: "DIV" }, null].map((t) => dup.isTypingTarget(t)),
   [{ tagName: "INPUT" }, { tagName: "DIV" }, null].map((t) => isTypingTarget(t)),
   "isTypingTarget 복제본이 lib 와 동일"
+);
+eq(dup.PLATFORM_DEFAULTS, PLATFORM_DEFAULTS, "운영체제별 기본값 복제본이 lib 와 동일");
+eq(
+  [{ platform: "MacIntel" }, { platform: "Win32" }, { userAgentData: { platform: "macOS" } }].map((n) => dup.isMacPlatform(n)),
+  [{ platform: "MacIntel" }, { platform: "Win32" }, { userAgentData: { platform: "macOS" } }].map((n) => isMacPlatform(n)),
+  "isMacPlatform 복제본이 lib 와 동일"
+);
+eq(
+  [true, false].map((m) => dup.readHotkeys(mixed, m)),
+  [true, false].map((m) => readHotkeys(mixed, m)),
+  "readHotkeys 복제본이 lib 와 동일"
 );
 
 // ---- 실행 후보 선정 -------------------------------------------------------

@@ -15,6 +15,8 @@
 //
 // 잠금 해제 세션: chrome.storage.session (메모리 전용) ua_otp_session { dekB64, expiresAt }
 //   자동 로그인과 별도의 자동 잠금(30분·1시간·4시간, 기본 30분).
+//   「잠그지 않음 (이 PC 기억)」이면 DEK 를 storage.local 에도 둔다(ua_device_otp_dek — 백업 대상 아님, device-prefs.js).
+import { L_OTP_DEK, getDevicePrefs, setDevicePrefs } from "./device-prefs.js";
 import { DEFAULT_ITERATIONS, deriveKey, fromB64, randomBytes, SALT_BYTES, toB64 } from "./crypto.js";
 import { normalizeEntry } from "./totp.js";
 
@@ -149,7 +151,13 @@ export async function rewrap(oldPassword, newPassword, vaultSalt) {
   if (!rec) return "none";
   const dekRaw = await unwrapDek(oldPassword, rec);
   if (!dekRaw) return "stale";
-  await chrome.storage.local.set({ [K_OTP_KEY]: await wrapDek(newPassword, dekRaw, vaultSalt) });
+  const next = await wrapDek(newPassword, dekRaw, vaultSalt);
+  const { [L_OTP_DEK]: rem } = await chrome.storage.local.get(L_OTP_DEK);
+  await chrome.storage.local.set({
+    [K_OTP_KEY]: next,
+    // 이 PC 에 기억한 DEK 는 그대로 유효하다(DEK 는 바뀌지 않음) → 감싼 레코드 표식만 새로 맞춘다
+    ...(rem && rem.dekB64 === toB64(dekRaw) ? { [L_OTP_DEK]: { dekB64: rem.dekB64, ct: next.ct } } : {}),
+  });
   return "done";
 }
 
@@ -168,16 +176,47 @@ export async function bindVaultSalt(vaultSalt) {
 // ---- 잠금 해제 세션 ------------------------------------------------------------
 export async function startSession(dekRaw) {
   const { autoLockMinutes } = await getOtpSettings();
+  const dekB64 = toB64(dekRaw);
   await chrome.storage.session.set({
-    [S_OTP_SESSION]: { dekB64: toB64(dekRaw), expiresAt: Date.now() + autoLockMinutes * 60000 },
+    [S_OTP_SESSION]: { dekB64, expiresAt: Date.now() + autoLockMinutes * 60000 },
   });
+  const { otpNeverLock } = await getDevicePrefs();
+  if (otpNeverLock) {
+    const rec = await getKeyRecord();
+    if (rec) await chrome.storage.local.set({ [L_OTP_DEK]: { dekB64, ct: rec.ct } });
+  }
 }
 
+/** 지금 잠그기 — 이 PC 에 기억한 DEK 도 지운다 */
 export async function lock() {
   await chrome.storage.session.remove([S_OTP_SESSION, S_OTP_PENDING]);
+  await chrome.storage.local.remove(L_OTP_DEK);
+}
+
+/** 「이 PC 기억」으로 둔 DEK. 옵션이 꺼졌거나 OTP 키가 바뀌었으면(백업 가져오기 등) 버린다. expiresAt 0 = 만료 없음 */
+async function rememberedSession() {
+  const { [L_OTP_DEK]: rem } = await chrome.storage.local.get(L_OTP_DEK);
+  if (!rem) return null;
+  const { otpNeverLock } = await getDevicePrefs();
+  const rec = await getKeyRecord();
+  if (!otpNeverLock || !rem.dekB64 || !rec || rem.ct !== rec.ct) {
+    await chrome.storage.local.remove(L_OTP_DEK);
+    return null;
+  }
+  return { dekB64: rem.dekB64, expiresAt: 0 };
+}
+
+/** 「잠그지 않음 (이 PC 기억)」 켜기/끄기 — 풀려 있던 상태는 그대로 이어 준다 */
+export async function setNeverLock(on) {
+  const s = await getSession();
+  await setDevicePrefs({ otpNeverLock: !!on });
+  if (!on) await chrome.storage.local.remove(L_OTP_DEK);
+  if (s) await startSession(fromB64(s.dekB64));
 }
 
 async function getSession() {
+  const remembered = await rememberedSession();
+  if (remembered) return remembered;
   const { [S_OTP_SESSION]: s } = await chrome.storage.session.get(S_OTP_SESSION);
   if (!s || !s.dekB64) return null;
   if (!s.expiresAt || Date.now() > s.expiresAt) {
@@ -189,7 +228,8 @@ async function getSession() {
 
 export async function sessionStatus() {
   const s = await getSession();
-  return { unlocked: !!s, expiresAt: s ? s.expiresAt : 0 };
+  const { otpNeverLock } = await getDevicePrefs();
+  return { unlocked: !!s, expiresAt: s ? s.expiresAt : 0, neverLock: otpNeverLock };
 }
 
 /** 잠금 해제된 DEK(CryptoKey). 잠겨 있으면 OtpError("LOCKED") */
@@ -202,7 +242,7 @@ export async function requireDek() {
 /** 복사·등록처럼 직접 쓴 경우에만 잠금 시간을 연장한다 (화면에 띄워 두는 것만으로는 연장하지 않음) */
 export async function touchSession() {
   const s = await getSession();
-  if (!s) return;
+  if (!s || !s.expiresAt) return; // 잠겨 있거나 이 PC 기억(만료 없음)
   const { autoLockMinutes } = await getOtpSettings();
   await chrome.storage.session.set({ [S_OTP_SESSION]: { ...s, expiresAt: Date.now() + autoLockMinutes * 60000 } });
 }

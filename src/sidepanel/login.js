@@ -6,14 +6,15 @@
 import { icon } from "./icons.js";
 import { encryptSecret } from "../lib/crypto.js";
 import {
-  DEFAULT_COPY_COMBO,
-  DEFAULT_PANEL_COMBO,
   comboFromEvent,
   displayCombo,
   hotkeyConflict,
+  hotkeySettingKey,
+  isMacPlatform,
   needsTypingGuard,
-  normalizeHotkey,
+  readHotkeys,
 } from "../lib/hotkey.js";
+import { NEVER_LOCK } from "../lib/device-prefs.js";
 import {
   describeSiteUrl,
   findMatchingSites,
@@ -525,14 +526,17 @@ async function renderSettings(st) {
   $("#sec-status").textContent = !s.initialized
     ? "미설정"
     : s.unlocked
-      ? `해제됨 · ${remainText(s.expiresAt)}`
+      ? s.expiresAt
+        ? `해제됨 · ${remainText(s.expiresAt)}`
+        : "해제됨 · 이 PC 기억"
       : "잠김";
-  $("#auto-lock-min").value = String(s.autoLockMinutes);
+  $("#auto-lock-min").value = s.neverLock ? NEVER_LOCK : String(s.autoLockMinutes);
+  $("#never-lock-note").classList.toggle("hidden", !s.neverLock);
   $("#btn-toggle-change-master").classList.toggle("hidden", !s.initialized);
 
   const shortcutHint = $("#login-shortcut-hint");
   if (shortcutHint) {
-    const hk = normalizeHotkey((await store.getSettings()).hotkey);
+    const hk = readHotkeys(await store.getSettings(), IS_MAC).auth;
     shortcutHint.innerHTML = hk.enabled
       ? `등록한 사이트에서 <span class="kbd">${esc(displayCombo(hk.combo, IS_MAC))}</span> → <b>로그인</b>, 이미 로그인된 상태면 <b>로그아웃</b>합니다.`
       : "단축키가 꺼져 있어요 — <b>설정 → 단축키</b>에서 켜세요.";
@@ -552,28 +556,26 @@ async function renderSettings(st) {
 // ---- 페이지 내 단축키 (F2 / F4 / Ctrl+Shift+Y) ----------------------------
 // Chrome commands API 는 Ctrl/Alt 를 반드시 포함해야 하고 F1~F12 를 지원하지 않으며, 키를 바꾸려면
 // chrome://extensions/shortcuts 로 가야 한다. 그래서 모든 단축키를 페이지에 심은 콘텐츠 스크립트로 받는다.
-const IS_MAC = /Mac/i.test(navigator.platform || navigator.userAgent || "");
+// 단축키는 운영체제별로 따로 저장한다(Mac / 그 외) — 이 PC 운영체제의 값만 보여 주고 바꾼다
+const IS_MAC = isMacPlatform();
 
 const HK = {
   auth: {
-    key: "hotkey",
-    fallback: "F2",
+    key: hotkeySettingKey("auth", IS_MAC),
     keyEl: "#page-hotkey",
     btn: "#btn-capture-hotkey",
     chk: "#page-hotkey-enabled",
     label: "로그인/로그아웃",
   },
   panel: {
-    key: "panelHotkey",
-    fallback: DEFAULT_PANEL_COMBO,
+    key: hotkeySettingKey("panel", IS_MAC),
     keyEl: "#panel-hotkey",
     btn: "#btn-capture-panel-hotkey",
     chk: "#panel-hotkey-enabled",
     label: "패널 열기/닫기",
   },
   copy: {
-    key: "copyHotkey",
-    fallback: DEFAULT_COPY_COMBO,
+    key: hotkeySettingKey("copy", IS_MAC),
     keyEl: "#copy-hotkey",
     btn: "#btn-capture-copy-hotkey",
     chk: "#copy-hotkey-enabled",
@@ -585,8 +587,8 @@ const HK_KINDS = Object.keys(HK);
 
 async function renderPageHotkey() {
   const st = await store.getSettings();
-  const vals = {};
-  for (const kind of HK_KINDS) vals[kind] = normalizeHotkey(st[HK[kind].key], HK[kind].fallback);
+  const vals = readHotkeys(st, IS_MAC);
+  $("#hotkey-os").textContent = IS_MAC ? "이 Mac 의 단축키" : "이 PC(Windows 등)의 단축키";
 
   for (const kind of HK_KINDS) {
     const cfg = HK[kind];
@@ -620,6 +622,16 @@ async function renderPageHotkey() {
     );
   }
   notes.push("페이지에 포커스가 있어야 하며, 주소창에 포커스가 있으면 동작하지 않습니다.");
+  notes.push(
+    IS_MAC
+      ? "Mac 과 Windows 의 단축키는 따로 저장됩니다. 여기서 바꿔도 Windows PC 의 단축키는 그대로입니다."
+      : "Mac 과 Windows 의 단축키는 따로 저장됩니다. 여기서 바꿔도 Mac 의 단축키는 그대로입니다."
+  );
+  if (IS_MAC && HK_KINDS.some((k) => vals[k].enabled && /^F([1-9]|1[0-2])$/.test(vals[k].combo))) {
+    notes.push(
+      "Mac 에서 F키 단독은 <b>fn</b> 을 함께 누르거나, 시스템 설정 → 키보드에서 「F1, F2 등의 키를 표준 기능 키로 사용」을 켜야 동작합니다."
+    );
+  }
   for (const kind of HK_KINDS) {
     if (vals[kind].enabled && needsTypingGuard(vals[kind].combo)) {
       notes.push(
@@ -683,8 +695,7 @@ function startCapture(kind) {
 
 async function toggleHotkeyEnabled(kind, enabled) {
   if (capturing) stopCapture();
-  const st = await store.getSettings();
-  const cur = normalizeHotkey(st[HK[kind].key], HK[kind].fallback);
+  const cur = readHotkeys(await store.getSettings(), IS_MAC)[kind];
   await store.setSettings({ [HK[kind].key]: { ...cur, enabled } });
   await renderPageHotkey();
   toast(`${HK[kind].label} 단축키를 ${enabled ? "켰어요" : "껐어요"}`);
@@ -866,9 +877,15 @@ function bindStaticEvents() {
 
   // 설정 화면
   $("#auto-lock-min").addEventListener("change", async (e) => {
-    await store.setSettings({ autoLockMinutes: Number(e.target.value) });
-    await vault.touchUnlock(); // 새 간격을 즉시 적용
-    toast("자동 잠금 시간을 변경했어요");
+    if (e.target.value === NEVER_LOCK) {
+      // 이 PC 에만 적용 (동기화되는 자동 잠금 시간은 건드리지 않는다)
+      await vault.setNeverLock(true);
+      toast("이 PC 에서는 잠그지 않아요");
+    } else {
+      await store.setSettings({ autoLockMinutes: Number(e.target.value) });
+      await vault.setNeverLock(false); // 기억한 키를 지우고 새 간격으로 세션을 이어 준다
+      toast("자동 잠금 시간을 변경했어요");
+    }
     await renderSettings();
   });
 

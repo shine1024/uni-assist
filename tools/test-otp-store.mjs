@@ -197,5 +197,43 @@ await call({ type: "OTP_UNLOCK", password: PW3 });
 eq(Math.round(((await call({ type: "OTP_STATUS" })).expiresAt - Date.now()) / 60000), 240, "4시간 잠금 적용");
 eq(store.normalizeOtpSettings({ autoLockMinutes: 480 }).autoLockMinutes, 240, "4시간 초과는 4시간");
 
+console.log("잠그지 않음 (이 PC 기억)");
+const { L_OTP_DEK } = await import("../src/lib/device-prefs.js");
+const backup = await import("../src/lib/backup.js");
+eq(local.data.has(L_OTP_DEK), false, "기본은 디스크에 DEK 를 두지 않음");
+eq((await call({ type: "OTP_SET_NEVER_LOCK", on: true })).ok, true, "옵션 켜기");
+eq(local.data.has(L_OTP_DEK), true, "풀린 상태에서 켜면 바로 기억");
+let ost = await call({ type: "OTP_STATUS" });
+eq([ost.neverLock, ost.unlocked, ost.expiresAt], [true, true, 0], "상태: 이 PC 기억 · 해제 · 만료 없음");
+session.data.clear(); // 브라우저 재시작
+eq((await call({ type: "OTP_LIST" })).items.length, 2, "재시작 뒤에도 잠금 해제 유지");
+eq(backup.buildBackup({ sync: {}, local: Object.fromEntries(local.data) }).local[L_OTP_DEK], undefined, "기억한 DEK 는 백업 파일에 들어가지 않음");
+
+// 마스터 비밀번호를 이 PC 에서 바꿔 DEK 를 다시 감싸도 기억은 유지 (DEK 는 그대로)
+const PW4 = "fourth password 4";
+await vault.changeMaster(PW3, PW4);
+eq((await call({ type: "OTP_REWRAP", oldPassword: PW3, newPassword: PW4 })).result, "done", "DEK 다시 감싸기");
+session.data.clear();
+eq((await call({ type: "OTP_LIST" })).items.length, 2, "다시 감싼 뒤에도 기억 유지");
+
+// OTP 키 레코드가 통째로 바뀌면(백업 가져오기 등) 기억한 DEK 는 버린다
+const okRec = local.data.get(store.K_OTP_KEY);
+local.data.set(store.K_OTP_KEY, { ...okRec, ct: "바뀐-레코드" });
+eq((await call({ type: "OTP_LIST" })).code, "LOCKED", "키 레코드가 바뀌면 기억을 쓰지 않음");
+eq(local.data.has(L_OTP_DEK), false, "바뀐 레코드의 기억은 삭제");
+local.data.set(store.K_OTP_KEY, okRec);
+
+eq((await call({ type: "OTP_UNLOCK", password: PW4 })).ok, true, "다시 해제");
+eq(local.data.has(L_OTP_DEK), true, "옵션이 켜져 있으면 해제 때 다시 기억");
+await call({ type: "OTP_LOCK" });
+eq(local.data.has(L_OTP_DEK), false, "지금 잠그기 → 기억 삭제");
+eq((await call({ type: "OTP_LIST" })).code, "LOCKED", "지금 잠그기 → 잠김");
+
+await call({ type: "OTP_UNLOCK", password: PW4 });
+await call({ type: "OTP_SET_NEVER_LOCK", on: false });
+ost = await call({ type: "OTP_STATUS" });
+eq([ost.neverLock, ost.unlocked, ost.expiresAt > Date.now()], [false, true, true], "끄면 시간 잠금으로 이어짐");
+eq(local.data.has(L_OTP_DEK), false, "끄면 기억 삭제");
+
 console.log(`\n${pass} 통과, ${fail} 실패`);
 process.exit(fail ? 1 : 0);

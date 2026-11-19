@@ -11,6 +11,8 @@
 //   절대 남지 않으며, 만료·수동 잠금 시 즉시 삭제한다.
 //
 // 만료는 타이머(alarms 권한) 없이 **접근 시점에 지연 평가**한다 → 추가 권한 불필요.
+//
+// 「잠그지 않음 (이 PC 기억)」을 고르면 같은 키를 storage.local 에도 둔다 → device-prefs.js 참고.
 
 import {
   DEFAULT_ITERATIONS,
@@ -34,6 +36,7 @@ import {
   setVaultMeta,
   SCHEMA_VERSION,
 } from "./login-store.js";
+import { L_VAULT_KEY, getDevicePrefs, setDevicePrefs } from "./device-prefs.js";
 
 /** 동기화가 아직 도착하지 않은 상태에서 금고를 새로 만들려 할 때의 오류 코드 */
 export const ERR_SYNC_PENDING = "SYNC_PENDING";
@@ -51,8 +54,32 @@ export async function isInitialized() {
   return !!(meta && meta.salt && meta.verifier);
 }
 
+/**
+ * 「이 PC 기억」으로 저장해 둔 키. 옵션이 꺼져 있거나, 저장할 때와 금고가 달라졌으면(다른 PC 에서
+ * 마스터 비밀번호를 바꿨거나 백업을 가져온 경우) 버리고 null.
+ */
+async function rememberedKey() {
+  const { vaultNeverLock } = await getDevicePrefs();
+  const { [L_VAULT_KEY]: rec } = await chrome.storage.local.get(L_VAULT_KEY);
+  if (!rec) return null;
+  const meta = await getVaultMeta();
+  // verifier 는 { iv, ct } 객체 → 값으로 비교한다
+  if (!vaultNeverLock || !rec.keyB64 || !meta || JSON.stringify(rec.verifier) !== JSON.stringify(meta.verifier)) {
+    await chrome.storage.local.remove(L_VAULT_KEY);
+    return null;
+  }
+  try {
+    return await importKeyB64(rec.keyB64);
+  } catch (_) {
+    await chrome.storage.local.remove(L_VAULT_KEY);
+    return null;
+  }
+}
+
 /** 잠금 해제된 키(CryptoKey) 또는 null. 만료된 세션은 즉시 폐기한다. */
 export async function getUnlockedKey() {
+  const remembered = await rememberedKey();
+  if (remembered) return remembered;
   const { [S_UNLOCK]: sess } = await chrome.storage.session.get(S_UNLOCK);
   if (!sess || !sess.keyB64) return null;
   if (!sess.expiresAt || Date.now() > sess.expiresAt) {
@@ -71,12 +98,15 @@ export async function status() {
   const initialized = await isInitialized();
   const { [S_UNLOCK]: sess } = await chrome.storage.session.get(S_UNLOCK);
   const live = !!(sess && sess.keyB64 && sess.expiresAt && Date.now() <= sess.expiresAt);
+  const remembered = initialized && !!(await rememberedKey());
   const { autoLockMinutes } = await getSettings();
+  const { vaultNeverLock } = await getDevicePrefs();
   return {
     initialized,
-    unlocked: live,
-    expiresAt: live ? sess.expiresAt : 0,
+    unlocked: live || remembered,
+    expiresAt: remembered ? 0 : live ? sess.expiresAt : 0, // 0 = 만료 없음(이 PC 기억) 또는 잠김
     autoLockMinutes,
+    neverLock: vaultNeverLock,
   };
 }
 
@@ -127,21 +157,41 @@ export async function verifyMaster(masterPassword) {
   return checkVerifier(key, meta.verifier);
 }
 
+/** 지금 잠그기 — 이 PC 에 기억한 키도 지운다(옵션은 그대로라 다음 잠금 해제 때 다시 기억한다) */
 export async function lock() {
   await chrome.storage.session.remove([S_UNLOCK]);
+  await chrome.storage.local.remove(L_VAULT_KEY);
 }
 
 async function startSession(key) {
   const { autoLockMinutes: mins } = await getSettings();
+  const keyB64 = await exportKeyB64(key);
   await chrome.storage.session.set({
-    [S_UNLOCK]: { keyB64: await exportKeyB64(key), expiresAt: Date.now() + mins * 60000 },
+    [S_UNLOCK]: { keyB64, expiresAt: Date.now() + mins * 60000 },
   });
+  const { vaultNeverLock } = await getDevicePrefs();
+  if (vaultNeverLock) {
+    const meta = await getVaultMeta();
+    await chrome.storage.local.set({ [L_VAULT_KEY]: { keyB64, verifier: meta && meta.verifier } });
+  }
+}
+
+/**
+ * 「잠그지 않음 (이 PC 기억)」 켜기/끄기.
+ *  켜기: 지금 잠금 해제돼 있으면 바로 기억한다(잠겨 있으면 다음 잠금 해제 때).
+ *  끄기: 기억한 키를 지우되, 풀려 있던 상태는 시간 잠금 세션으로 이어 준다(바로 잠기지 않게).
+ */
+export async function setNeverLock(on) {
+  const key = await getUnlockedKey();
+  await setDevicePrefs({ vaultNeverLock: !!on });
+  if (!on) await chrome.storage.local.remove(L_VAULT_KEY);
+  if (key) await startSession(key);
 }
 
 /** 사용할 때마다 만료 시각을 연장 (활동 기반 자동 잠금) */
 export async function touchUnlock() {
   const { [S_UNLOCK]: sess } = await chrome.storage.session.get(S_UNLOCK);
-  if (!sess || !sess.keyB64) return;
+  if (!sess || !sess.keyB64) return; // 기억한 키만 있는 경우(브라우저 재시작 후)는 연장할 만료가 없다
   const { autoLockMinutes: mins } = await getSettings();
   await chrome.storage.session.set({
     [S_UNLOCK]: { ...sess, expiresAt: Date.now() + mins * 60000 },

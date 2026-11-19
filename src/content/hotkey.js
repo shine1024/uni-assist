@@ -1,4 +1,6 @@
-// 콘텐츠 스크립트 — 페이지 내 단축키 (기본 F2 = 로그인/로그아웃, F4 = 사이드 패널 열기·닫기, Ctrl+Shift+Y = 추출 결과 복사)
+// 콘텐츠 스크립트 — 페이지 내 단축키
+//  기본값 Windows 등: F2 = 로그인/로그아웃, F4 = 사이드 패널 열기·닫기, Ctrl+Shift+Y = 추출 결과 복사
+//        Mac       : ⌃⌥L / ⌃⌥P / ⌃⌥C  (Mac 의 F키는 fn 없이는 크롬에 오지 않는다 — ../lib/hotkey.js 참고)
 //
 // 왜 commands API 를 쓰지 않는가: Chrome `commands` 는 단축키에 Ctrl/Alt 를 반드시 포함해야 하고,
 // 지원 키 목록에 F1~F12 가 없다(공식 문서). 즉 F2/F4 단독 키는 등록 자체가 불가능하다.
@@ -9,7 +11,8 @@
 // 서비스 워커가 await 를 만나면 사라진다 → SW 쪽에서 동기적으로 호출한다.
 //
 // 이 스크립트는 ES 모듈이 아니므로 ../lib/hotkey.js 를 import 할 수 없다.
-// → `comboFromEvent` / `isTypingTarget` / `needsTypingGuard` 를 아래에 복제해 두었다.
+// → `comboFromEvent` / `isTypingTarget` / `needsTypingGuard` / `PLATFORM_DEFAULTS` / `isMacPlatform` /
+//   `normalizeHotkey` / `readHotkeys` 를 아래에 복제해 두었다.
 //   (tools/test-hotkey.mjs 가 복제본이 lib 와 일치하는지 검사한다 — 한쪽만 고치면 테스트 실패)
 
 (() => {
@@ -27,20 +30,19 @@
   };
 
   const SETTINGS_KEY = "ua_login_settings";
-  const DEFAULT_COMBO = "F2";
-  const DEFAULT_PANEL_COMBO = "F4";
-  const DEFAULT_COPY_COMBO = "Ctrl+Shift+Y";
   const MOD_KEYS = new Set(["Control", "Alt", "Shift", "Meta", "CapsLock", "Dead"]);
 
-  let auth = { combo: DEFAULT_COMBO, enabled: true };
-  let panel = { combo: DEFAULT_PANEL_COMBO, enabled: true };
-  let copy = { combo: DEFAULT_COPY_COMBO, enabled: true };
+  let auth = { combo: "", enabled: false }; // 설정을 읽기 전에는 아무 키도 가로채지 않는다
+  let panel = { combo: "", enabled: false };
+  let copy = { combo: "", enabled: false };
   const busyUntil = { auth: 0, panel: 0, copy: 0 };
   const COOLDOWN = { auth: 1200, panel: 350, copy: 600 };
 
   // ---- ../lib/hotkey.js 와 동일해야 하는 부분 ---------------------------
   function comboFromEvent(e) {
-    let k = e.key;
+    const code = e.code || "";
+    const m = /^(?:Key([A-Z])|Digit([0-9]))$/.exec(code);
+    let k = m ? m[1] || m[2] : e.key;
     if (!k || MOD_KEYS.has(k)) return null;
     if (k === " ") k = "Space";
     else if (k.length === 1) k = k.toUpperCase();
@@ -66,17 +68,39 @@
       !/^F([1-9]|1[0-2])$/.test(c) && !/^(Escape|Insert|Delete|Home|End|PageUp|PageDown)$/.test(c)
     );
   }
-  // ---------------------------------------------------------------------
 
-  function normalize(h, fallback) {
+  const PLATFORM_DEFAULTS = {
+    win: { auth: "F2", panel: "F4", copy: "Ctrl+Shift+Y" },
+    mac: { auth: "Ctrl+Alt+L", panel: "Ctrl+Alt+P", copy: "Ctrl+Alt+C" },
+  };
+  const SETTING_KEYS = { auth: "hotkey", panel: "panelHotkey", copy: "copyHotkey" };
+
+  function isMacPlatform(nav = globalThis.navigator) {
+    if (!nav) return false;
+    const p = (nav.userAgentData && nav.userAgentData.platform) || nav.platform || nav.userAgent || "";
+    return /mac/i.test(p);
+  }
+
+  function normalizeHotkey(h, fallback) {
     const combo = h && typeof h.combo === "string" && h.combo.trim() ? h.combo.trim() : fallback;
     return { combo, enabled: !h || h.enabled !== false };
   }
 
+  function readHotkeys(settings, isMac) {
+    const s = settings || {};
+    const out = {};
+    for (const kind of ["auth", "panel", "copy"]) {
+      const key = SETTING_KEYS[kind] + (isMac ? "Mac" : "");
+      out[kind] = normalizeHotkey(s[key], PLATFORM_DEFAULTS[isMac ? "mac" : "win"][kind]);
+    }
+    return out;
+  }
+  // ---------------------------------------------------------------------
+
+  const IS_MAC = isMacPlatform();
+
   function applySettings(s) {
-    auth = normalize(s && s.hotkey, DEFAULT_COMBO);
-    panel = normalize(s && s.panelHotkey, DEFAULT_PANEL_COMBO);
-    copy = normalize(s && s.copyHotkey, DEFAULT_COPY_COMBO);
+    ({ auth, panel, copy } = readHotkeys(s, IS_MAC));
   }
 
   // 이 리스너는 패널 토글(F4) 때문에 모든 페이지에 심긴다.

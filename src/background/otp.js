@@ -242,6 +242,7 @@ export function otpAction(msg, { copyText, decodeQr }) {
     OTP_MIGRATE_MASTER: () => migrateMaster(msg.oldPassword, msg.password),
     OTP_REWRAP: () => rewrapAfterChange(msg.oldPassword, msg.newPassword),
     OTP_LOCK: async () => (await store.lock(), { ok: true }),
+    OTP_SET_NEVER_LOCK: async () => (await store.setNeverLock(!!msg.on), { ok: true }),
     OTP_LIST: () => list(),
     OTP_COPY: () => copyCode(msg.id, copyText),
     OTP_ADD: () => addManual(msg.entry),
