@@ -478,6 +478,27 @@
           <input id="backup-file" type="file" accept="application/json,.json" class="hidden" />
         </section>
 
+        <!-- 데이터 지우기 -->
+        <section class="card">
+          <div class="card-head">
+            <h2><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg>데이터 지우기</h2>
+          </div>
+          <p class="muted hint-text">
+            <b>이 PC 데이터 지우기</b> — OTP 인증기, 슬랙·Claude 연결(슬랙 토큰은 폐기), 「잠그지 않음」 기억,
+            텍스트 추출 규칙·프리셋, 잠금 해제 상태를 지웁니다. 동기화되는 자동 로그인 사이트·계정은
+            <b>암호화된 채로 남고</b> 다른 PC 에는 영향이 없습니다.<br />
+            <b>전체 초기화</b> — 위 항목에 더해 동기화 데이터(자동 로그인 사이트·계정·금고, 설정, 슬랙 앱 정보)까지 지웁니다.
+          </p>
+          <div class="result-actions">
+            <button id="btn-wipe-device" class="btn btn-ghost btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg>이 PC 데이터 지우기</button>
+            <button id="btn-wipe-all" class="btn btn-danger btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg>전체 초기화</button>
+          </div>
+          <p class="muted warn-text">
+            ⚠ 크롬 동기화가 켜져 있으면 「전체 초기화」의 삭제도 동기화되어 <b>다른 PC 와 구글 서버에서도 지워집니다.</b>
+            이 PC 에서만 지우려면 먼저 크롬에서 로그아웃(동기화 끄기)하세요.
+          </p>
+        </section>
+
         <!-- 단축키 -->
         <section class="shortcut card">
           <div class="card-head">

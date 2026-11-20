@@ -3,6 +3,7 @@ import { K_SITE_RULES } from "../lib/site-rules.js";
 import { backupFileName, buildBackup, isBackupLocalKey, parseBackup, summarizeBackup, SYNC_PREFIX } from "../lib/backup.js";
 import * as vault from "../lib/vault.js";
 import { OTP_LOCAL_PREFIX } from "../lib/otp-store.js";
+import { isResetConfirmed, RESET_CONFIRM_WORD, wipeStorage, WIPE_ALL, WIPE_DEVICE } from "../lib/wipe.js";
 
 const $ = (s) => document.querySelector(s);
 let toast = () => {};
@@ -65,6 +66,39 @@ async function importBackup(file) {
   setTimeout(() => location.reload(), 900);
 }
 
+// ---- 데이터 지우기 ----------------------------------------------------------
+
+async function wipe(scope) {
+  const all = scope === WIPE_ALL;
+  const what = all
+    ? "이 PC 데이터와 동기화 데이터(자동 로그인 사이트·계정·금고, 설정, 슬랙 앱 정보)를 모두 지웁니다.\n\n" +
+      "⚠ 크롬 동기화가 켜져 있으면 다른 PC 와 구글 서버에서도 지워집니다.\n" +
+      "이 PC 에서만 지우려면 취소하고 먼저 크롬에서 로그아웃(동기화 끄기)하세요."
+    : "OTP 인증기, 슬랙·Claude 연결, 「잠그지 않음」 기억, 텍스트 추출 규칙·프리셋을 이 PC 에서 지웁니다.\n" +
+      "동기화되는 자동 로그인 사이트·계정은 암호화된 채로 남습니다.";
+  if (!confirm(`${all ? "전체 초기화" : "이 PC 데이터 지우기"}\n\n${what}\n\n계속할까요?`)) return;
+
+  if (confirm("지우기 전에 백업 파일을 내보낼까요?\n\n확인 = 내보낸 뒤 계속 / 취소 = 백업 없이 계속")) {
+    await exportBackup();
+  }
+  if (all) {
+    const typed = prompt(`정말 전체 초기화할까요? 확인하려면 「${RESET_CONFIRM_WORD}」를 입력하세요.`);
+    if (!isResetConfirmed(typed)) {
+      if (typed !== null) toast("입력이 달라서 취소했어요");
+      return;
+    }
+  }
+
+  // 슬랙 토큰은 지우기 전에 서버에서 폐기하고, 해제 세션을 먼저 닫는다
+  await chrome.runtime.sendMessage({ type: "APPROVAL_DISCONNECT" }).catch(() => null);
+  await chrome.runtime.sendMessage({ type: "OTP_LOCK" }).catch(() => {});
+  await vault.lock().catch(() => {});
+  await wipeStorage({ sync: chrome.storage.sync, local: chrome.storage.local, session: chrome.storage.session }, scope);
+
+  toast(all ? "전체 초기화했어요 — 패널을 다시 불러옵니다" : "이 PC 데이터를 지웠어요 — 패널을 다시 불러옵니다");
+  setTimeout(() => location.reload(), 900);
+}
+
 export function initBackupUI(deps) {
   toast = deps.toast;
   const input = $("#backup-file");
@@ -72,6 +106,12 @@ export function initBackupUI(deps) {
     exportBackup().catch((e) => toast("내보내기 실패: " + e.message))
   );
   $("#btn-backup-import").addEventListener("click", () => input.click());
+  $("#btn-wipe-device").addEventListener("click", () =>
+    wipe(WIPE_DEVICE).catch((e) => toast("지우기 실패: " + e.message))
+  );
+  $("#btn-wipe-all").addEventListener("click", () =>
+    wipe(WIPE_ALL).catch((e) => toast("초기화 실패: " + e.message))
+  );
   input.addEventListener("change", () => {
     const file = input.files && input.files[0];
     input.value = ""; // 같은 파일을 다시 골라도 change 가 오도록
